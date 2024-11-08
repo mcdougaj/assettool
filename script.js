@@ -357,26 +357,25 @@ function updateEditForm(node) {
     editForm.innerHTML = '';
     const nodeData = findNodeData(node.text.split(' - ')[0]);
 
-    if (nodeData) {
-        Object.keys(nodeData).forEach(field => {
-            const formGroup = document.createElement('div');
-            formGroup.className = 'form-group';
-            
-            const label = document.createElement('label');
-            label.textContent = field;
-            
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.value = nodeData[field];
-            input.dataset.field = field;
-            
-            formGroup.appendChild(label);
-            formGroup.appendChild(input);
-            editForm.appendChild(formGroup);
-        });
+    const allColumns = Object.keys(excelData[0]);
+    allColumns.forEach(field => {
+        const formGroup = document.createElement('div');
+        formGroup.className = 'form-group';
         
-        editActions.style.display = 'flex';
-    }
+        const label = document.createElement('label');
+        label.textContent = field;
+        
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = nodeData ? nodeData[field] || '' : '';
+        input.dataset.field = field;
+        
+        formGroup.appendChild(label);
+        formGroup.appendChild(input);
+        editForm.appendChild(formGroup);
+    });
+    
+    editActions.style.display = 'flex';
 }
 
 function findNodeData(nodeText) {

@@ -16,6 +16,9 @@
     </div>
     <div class="container">
         <div class="sidebar" id="leftPanel">
+            <div class="actions" style="margin-bottom: 20px;">
+                <button id="reloadPage" class="primary-button">Reload</button>
+            </div>
             <div class="collapsible-section">
                 <div class="section-header">
                     <h3>Instructions</h3>
@@ -154,5 +157,10 @@
     </div>
 
     <script src="script.js"></script>
+    <script>
+        document.getElementById('reloadPage').addEventListener('click', function() {
+            location.reload();
+        });
+    </script>
 </body>
 </html>

@@ -1,0 +1,53 @@
+{
+  "data": [
+    {
+      "Department": "Engineering",
+      "Team": "Frontend",
+      "Description": "Web interface development team"
+    },
+    {
+      "Department": "Engineering",
+      "Team": "Backend",
+      "Description": "Server-side development team"
+    },
+    {
+      "Department": "Engineering",
+      "Team": "DevOps",
+      "Description": "Infrastructure and deployment team"
+    },
+    {
+      "Department": "Marketing",
+      "Team": "Digital",
+      "Description": "Online marketing initiatives"
+    },
+    {
+      "Department": "Marketing",
+      "Team": "Content",
+      "Description": "Content creation and strategy"
+    },
+    {
+      "Department": "Sales",
+      "Team": "Enterprise",
+      "Description": "Large business accounts"
+    },
+    {
+      "Department": "Sales",
+      "Team": "SMB",
+      "Description": "Small and medium business"
+    },
+    {
+      "Department": "Support",
+      "Team": "Technical",
+      "Description": "Product technical support"
+    },
+    {
+      "Department": "Support",
+      "Team": "Customer Service",
+      "Description": "General customer assistance"
+    },
+    {
+      "Team": "Quality Assurance",
+      "Description": "Testing and validation team"
+    }
+  ]
+}

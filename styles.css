@@ -3,13 +3,14 @@
     background-color: #f8f9fa;
     border-radius: 6px;
     margin-bottom: 20px;
+    font-size: 14px; /* Smaller font size */
 }
 
 .section-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 15px;
+    padding: 10px; /* Smaller padding */
     background-color: #e9ecef;
     border-radius: 6px;
     cursor: pointer;
@@ -18,6 +19,7 @@
 .section-header h3 {
     margin: 0;
     color: #212529;
+    font-size: 16px; /* Smaller font size */
 }
 
 .toggle-button {
@@ -45,15 +47,15 @@
 }
 
 .section-content {
-    padding: 15px;
-    max-height: 500px;
+    padding: 10px; /* Smaller padding */
+    max-height: 300px; /* Smaller max height */
     overflow: hidden;
     transition: max-height 0.3s ease-out, padding 0.3s ease-out;
 }
 
 .section-content.collapsed {
     max-height: 0;
-    padding: 0 15px;
+    padding: 0 10px;
 }
 
 /* Rest of the existing styles */
@@ -136,6 +138,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 20px;
+    overflow-y: auto;
 }
 
 /* Search styles */
@@ -267,10 +270,12 @@ body {
 .columns-list {
     border: 1px solid #dee2e6;
     min-height: 100px;
+    max-height: 200px; /* Add max height */
     padding: 10px;
     background: white;
     border-radius: 6px;
     box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+    overflow-y: auto; /* Add overflow-y for scroll bar */
 }
 
 .placeholder-text {
@@ -348,6 +353,11 @@ button {
     cursor: pointer;
     font-weight: 600;
     transition: all 0.2s ease;
+    transition: background-color 0.2s, transform 0.2s; /* Add transition for hover effects */
+}
+
+button:hover {
+    transform: translateY(-1px); /* Add hover effect */
 }
 
 .primary-button {
