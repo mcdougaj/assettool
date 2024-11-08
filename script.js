@@ -405,7 +405,7 @@ function updateEditForm(node) {
     }
 
     editForm.innerHTML = '';
-    const nodeData = findNodeData(node.text.split(' - ')[0]);
+    const nodeData = findNodeData(node.id); // Use node.id instead of node.text
     
     // Save initial state to edit history
     if (nodeData) {
@@ -433,10 +433,9 @@ function updateEditForm(node) {
     editActions.style.display = 'flex';
 }
 
-function findNodeData(nodeText) {
+function findNodeData(nodeId) {
     return excelData.find(row => {
-        return row[columnMappings.parent] === nodeText || 
-               row[columnMappings.child] === nodeText;
+        return row[columnMappings.child] === nodeId;
     });
 }
 
@@ -479,7 +478,7 @@ function updateTreeView() {
         const childValue = row[columnMappings.child];
         const description = columnMappings.description ? row[columnMappings.description] : '';
 
-        if (parentValue) {
+        if (parentValue && parentValue !== childValue) { // Ensure parent is not the same as child
             if (!parentChildMap.has(parentValue)) {
                 parentChildMap.set(parentValue, []);
             }
