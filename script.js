@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeResizablePanels();
     initializeCollapsibleSections();
     initializeUndoButton();
+    initializeOrphanSearch();
 });
 
 function initializeUndoButton() {
@@ -276,6 +277,8 @@ function buildTreeFromSearchResults(results) {
 
 function clearSearch() {
     document.getElementById('searchInput').value = '';
+    document.getElementById('orphanSearchContainer').style.display = 'none';
+    window.currentOrphans = null; // Clear orphans data
     updateTreeView();
 }
 
@@ -504,6 +507,20 @@ function showOrphanRecords() {
         return;
     }
 
+    // Store orphans for searching
+    window.currentOrphans = orphans;
+    displayOrphanRecords(orphans);
+
+    if (orphans.length > 0) {
+        const firstOrphan = orphans[0];
+        updateEditForm({ text: firstOrphan[columnMappings.child] });
+    }
+
+    // Show orphan search box
+    document.getElementById('orphanSearchContainer').style.display = 'block';
+}
+
+function displayOrphanRecords(orphans) {
     const treeData = orphans.map(row => ({
         text: row[columnMappings.child] + 
               (columnMappings.description && row[columnMappings.description] ? 
@@ -516,11 +533,38 @@ function showOrphanRecords() {
 
     $('#treeView').jstree(true).settings.core.data = treeData;
     $('#treeView').jstree(true).refresh();
+}
 
-    if (orphans.length > 0) {
-        const firstOrphan = orphans[0];
-        updateEditForm({ text: firstOrphan[columnMappings.child] });
+function searchOrphans() {
+    const searchTerm = document.getElementById('orphanSearchInput').value.toLowerCase();
+    if (!window.currentOrphans) return;
+
+    const filteredOrphans = window.currentOrphans.filter(row => {
+        const childMatch = row[columnMappings.child].toString().toLowerCase().includes(searchTerm);
+        const descMatch = columnMappings.description && row[columnMappings.description] ?
+            row[columnMappings.description].toString().toLowerCase().includes(searchTerm) : false;
+        return childMatch || descMatch;
+    });
+
+    displayOrphanRecords(filteredOrphans);
+}
+
+function clearOrphanSearch() {
+    document.getElementById('orphanSearchInput').value = '';
+    if (window.currentOrphans) {
+        displayOrphanRecords(window.currentOrphans);
     }
+}
+
+// Add to initialization
+function initializeOrphanSearch() {
+    document.getElementById('orphanSearchButton').addEventListener('click', searchOrphans);
+    document.getElementById('orphanSearchClear').addEventListener('click', clearOrphanSearch);
+    document.getElementById('orphanSearchInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            searchOrphans();
+        }
+    });
 }
 
 function saveChanges() {

@@ -12,7 +12,7 @@
 </head>
 <body>
     <div class="logo-container">
-        <img src="https://isteam.wsimg.com/ip/9ecbb760-6b1e-455b-a25c-2f202fd00b4b/logonobackglambda1-0002.png/:/rs=h:206/qt=q:95" alt="Logo" class="logo">
+        <img src="assets/logo.png" alt="Company Logo" class="logo">
     </div>
     <div class="container">
         <div class="sidebar" id="leftPanel">
@@ -71,6 +71,15 @@
                 </div>
             </div>
 
+            <div class="search-container" id="orphanSearchContainer" style="display: none;">
+                <h3>Search Orphan Records</h3>
+                <div class="search-box">
+                    <input type="text" id="orphanSearchInput" placeholder="Search in orphan records...">
+                    <button id="orphanSearchButton" class="primary-button">Search</button>
+                    <button id="orphanSearchClear" class="secondary-button">Reset</button>
+                </div>
+            </div>
+
             <div class="collapsible-section">
                 <div class="section-header">
                     <h3>Available Columns</h3>
@@ -121,13 +130,16 @@
         </div>
         <div class="resize-handle right-handle"></div>
         <div class="edit-panel" id="rightPanel">
-            <h3 id="editPanelTitle">Edit Record</h3>
-            <div id="editForm" class="edit-form">
-                <p class="placeholder-text">Select a node in the tree to edit its values</p>
-            </div>
-            <div class="edit-actions" style="display: none;">
-                <button id="applyChanges" class="primary-button">Apply Changes</button>
-                <button id="cancelChanges" class="secondary-button">Cancel</button>
+            <div class="logo-space"></div>
+            <div class="edit-panel-content">
+                <h3 id="editPanelTitle">Edit Record</h3>
+                <div id="editForm" class="edit-form">
+                    <p class="placeholder-text">Select a node in the tree to edit its values</p>
+                </div>
+                <div class="edit-actions" style="display: none;">
+                    <button id="applyChanges" class="primary-button">Apply Changes</button>
+                    <button id="cancelChanges" class="secondary-button">Cancel</button>
+                </div>
             </div>
         </div>
     </div>
