@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hierarchy TreeView Manager</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/themes/default/style.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/jstree.min.js"></script>
+</head>
+<body>
+    <div class="logo-container">
+        <img src="https://isteam.wsimg.com/ip/9ecbb760-6b1e-455b-a25c-2f202fd00b4b/logonobackglambda1-0002.png/:/rs=h:206/qt=q:95" alt="Logo" class="logo">
+    </div>
+    <div class="container">
+        <div class="sidebar" id="leftPanel">
+            <div class="collapsible-section">
+                <div class="section-header">
+                    <h3>Instructions</h3>
+                    <button class="toggle-button">
+                        <span class="toggle-icon">▼</span>
+                    </button>
+                </div>
+                <div class="section-content">
+                    <ol>
+                        <li>Load an Excel (.xlsx) file using the button below</li>
+                        <li>Drag columns from "Available Columns" to set up your hierarchy:
+                            <ul>
+                                <li>Parent Column: Top level of hierarchy</li>
+                                <li>Child Column: Second level items</li>
+                                <li>Description: Optional details for each item</li>
+                            </ul>
+                        </li>
+                        <li>The treeview will update automatically as you map columns</li>
+                        <li>Use "Show Orphan Records" to view items without parents</li>
+                        <li>Click "Save Changes" to export your modified hierarchy</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="file-input">
+                <input type="file" id="excelFile" accept=".xlsx, .xls">
+                <button id="loadFile" class="primary-button">Load File</button>
+            </div>
+
+            <div class="search-container">
+                <h3>Search Hierarchy</h3>
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="Search in hierarchy...">
+                    <button id="searchButton" class="primary-button">Search</button>
+                    <button id="clearSearch" class="secondary-button">Reset View</button>
+                </div>
+                <div class="search-options">
+                    <label>
+                        <input type="checkbox" id="searchParent" checked>
+                        Search in Parent
+                    </label>
+                    <label>
+                        <input type="checkbox" id="searchChild" checked>
+                        Search in Child
+                    </label>
+                    <label>
+                        <input type="checkbox" id="searchDescription">
+                        Search in Description
+                    </label>
+                </div>
+            </div>
+
+            <div class="collapsible-section">
+                <div class="section-header">
+                    <h3>Available Columns</h3>
+                    <button class="toggle-button">
+                        <span class="toggle-icon">▼</span>
+                    </button>
+                </div>
+                <div class="section-content">
+                    <div id="columnsList" class="columns-list">
+                        <p class="placeholder-text">Load a file to see available columns</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="collapsible-section">
+                <div class="section-header">
+                    <h3>Column Mapping</h3>
+                    <button class="toggle-button">
+                        <span class="toggle-icon">▼</span>
+                    </button>
+                </div>
+                <div class="section-content">
+                    <div class="mapping-field">
+                        <label>Parent Column:</label>
+                        <div id="parentTarget" class="drop-target" data-type="parent">Drop Parent Column Here</div>
+                    </div>
+                    <div class="mapping-field">
+                        <label>Child Column:</label>
+                        <div id="childTarget" class="drop-target" data-type="child">Drop Child Column Here</div>
+                    </div>
+                    <div class="mapping-field">
+                        <label>Description Column (Optional):</label>
+                        <div id="descTarget" class="drop-target" data-type="description">Drop Description Column Here</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button id="addNewRecord" class="primary-button">Add New Record</button>
+                <button id="showOrphans" class="secondary-button">Show Orphan Records</button>
+                <button id="saveChanges" class="primary-button">Save Changes</button>
+            </div>
+        </div>
+        <div class="resize-handle left-handle"></div>
+        <div class="main-content">
+            <div id="treeView"></div>
+        </div>
+        <div class="resize-handle right-handle"></div>
+        <div class="edit-panel" id="rightPanel">
+            <h3 id="editPanelTitle">Edit Record</h3>
+            <div id="editForm" class="edit-form">
+                <p class="placeholder-text">Select a node in the tree to edit its values</p>
+            </div>
+            <div class="edit-actions" style="display: none;">
+                <button id="applyChanges" class="primary-button">Apply Changes</button>
+                <button id="cancelChanges" class="secondary-button">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Record Modal -->
+    <div id="newRecordModal" class="modal">
+        <div class="modal-content">
+            <h3>Add New Record</h3>
+            <div class="new-record-form">
+                <div class="form-group">
+                    <label>Parent Value:</label>
+                    <input type="text" id="newParentValue">
+                </div>
+                <div class="form-group">
+                    <label>Child Value:</label>
+                    <input type="text" id="newChildValue">
+                </div>
+                <div class="form-group">
+                    <label>Description:</label>
+                    <input type="text" id="newDescription">
+                </div>
+                <div class="modal-actions">
+                    <button id="saveNewRecord" class="primary-button">Save Record</button>
+                    <button id="cancelNewRecord" class="secondary-button">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
