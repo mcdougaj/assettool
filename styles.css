@@ -382,6 +382,17 @@ button:hover {
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
+.undo-button {
+    background-color: #ff9800;
+    color: white;
+}
+
+.undo-button:hover {
+    background-color: #f57c00;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
 #treeView {
     height: 100%;
     overflow: auto;

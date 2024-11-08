@@ -7,6 +7,7 @@ let columnMappings = {
 let selectedNode = null;
 let originalWorkbook = null;
 let lastTreeData = null;
+let historyStack = []; // Add history stack
 
 document.addEventListener('DOMContentLoaded', function() {
     initializeFileLoader();
@@ -17,7 +18,21 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeSearch();
     initializeResizablePanels();
     initializeCollapsibleSections();
+    initializeUndoButton();
 });
+
+function initializeUndoButton() {
+    document.getElementById('undoHierarchy').addEventListener('click', undoLastChange);
+}
+
+function undoLastChange() {
+    if (historyStack.length > 0) {
+        excelData = JSON.parse(historyStack.pop()); // Restore previous state
+        updateTreeView();
+    } else {
+        alert('No more changes to undo');
+    }
+}
 
 function initializeCollapsibleSections() {
     const sections = document.querySelectorAll('.collapsible-section');
@@ -127,6 +142,7 @@ function initializeNewRecordModal() {
             return;
         }
 
+        historyStack.push(JSON.stringify(excelData)); // Save current state
         const newRecord = {};
         newRecord[columnMappings.parent] = parentValue;
         newRecord[columnMappings.child] = childValue;
@@ -311,6 +327,7 @@ function handleDrop(e) {
     const column = e.dataTransfer.getData('text/plain');
     e.currentTarget.textContent = column;
     
+    historyStack.push(JSON.stringify(excelData)); // Save current state
     const mappingType = e.currentTarget.dataset.type;
     columnMappings[mappingType] = column;
     
@@ -397,6 +414,7 @@ function applyChanges() {
     );
 
     if (rowIndex !== -1) {
+        historyStack.push(JSON.stringify(excelData)); // Save current state
         formInputs.forEach(input => {
             excelData[rowIndex][input.dataset.field] = input.value;
         });
