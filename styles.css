@@ -119,8 +119,21 @@ body {
     border-right: 1px solid #dee2e6;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    height: 100vh; /* Ensure full height */
+}
+
+.sidebar-content {
+    flex: 1;
     overflow-y: auto;
+    margin-bottom: 20px;
+}
+
+.sidebar .actions {
+    position: sticky;
+    bottom: 0;
+    background-color: #f8f9fa;
+    padding: 20px 0;
+    border-top: 1px solid #dee2e6;
 }
 
 .main-content {
@@ -150,11 +163,23 @@ body {
 }
 
 .edit-panel-content {
-    padding: 20px;
     display: flex;
     flex-direction: column;
     gap: 20px;
-    height: 100%;
+    height: calc(100vh - 80px); /* Subtract logo space height */
+}
+
+.edit-form-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.edit-panel-footer {
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-top: 1px solid #dee2e6;
 }
 
 #editPanelTitle {
@@ -297,7 +322,7 @@ body {
 .edit-actions {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
     margin-top: auto;
 }
 
@@ -310,6 +335,7 @@ body {
     border-radius: 6px;
     box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
     overflow-y: auto; /* Add overflow-y for scroll bar */
+    margin-bottom: 10px;
 }
 
 .placeholder-text {
@@ -548,6 +574,18 @@ input[type="file"] {
 #orphanSearchContainer .search-box input:focus {
     border-color: #ffc107;
     box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
+}
+
+/* ...existing code... */
+
+.tree-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
 }
 
 /* ...existing code... */

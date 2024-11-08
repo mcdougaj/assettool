@@ -8,6 +8,7 @@ let selectedNode = null;
 let originalWorkbook = null;
 let lastTreeData = null;
 let historyStack = []; // Add history stack
+let editHistory = [];
 
 document.addEventListener('DOMContentLoaded', function() {
     initializeFileLoader();
@@ -355,6 +356,15 @@ function initializeTreeView() {
         updateEditForm(selectedNode);
     });
 
+    // Add expand/collapse handlers
+    document.getElementById('expandAll').addEventListener('click', function() {
+        $('#treeView').jstree('open_all');
+    });
+    
+    document.getElementById('collapseAll').addEventListener('click', function() {
+        $('#treeView').jstree('close_all');
+    });
+
     document.getElementById('showOrphans').addEventListener('click', showOrphanRecords);
     document.getElementById('saveChanges').addEventListener('click', saveChanges);
 }
@@ -362,6 +372,25 @@ function initializeTreeView() {
 function initializeEditPanel() {
     document.getElementById('applyChanges').addEventListener('click', applyChanges);
     document.getElementById('cancelChanges').addEventListener('click', cancelChanges);
+    document.getElementById('undoEditChanges').addEventListener('click', undoEditChanges);
+}
+
+function undoEditChanges() {
+    if (editHistory.length > 0) {
+        const lastState = editHistory.pop();
+        const rowIndex = excelData.findIndex(row => 
+            row[columnMappings.parent] === lastState[columnMappings.parent] || 
+            row[columnMappings.child] === lastState[columnMappings.child]
+        );
+
+        if (rowIndex !== -1) {
+            excelData[rowIndex] = { ...lastState };
+            updateTreeView();
+            updateEditForm(selectedNode);
+        }
+    } else {
+        alert('No more edit changes to undo');
+    }
 }
 
 function updateEditForm(node) {
@@ -369,6 +398,7 @@ function updateEditForm(node) {
     const editActions = document.querySelector('.edit-actions');
     
     if (!node || !excelData) {
+        editHistory = []; // Clear edit history for new node
         editForm.innerHTML = '<p class="placeholder-text">Select a node in the tree to edit its values</p>';
         editActions.style.display = 'none';
         return;
@@ -376,6 +406,11 @@ function updateEditForm(node) {
 
     editForm.innerHTML = '';
     const nodeData = findNodeData(node.text.split(' - ')[0]);
+    
+    // Save initial state to edit history
+    if (nodeData) {
+        editHistory = [{ ...nodeData }];
+    }
 
     const allColumns = Object.keys(excelData[0]);
     allColumns.forEach(field => {
@@ -417,7 +452,9 @@ function applyChanges() {
     );
 
     if (rowIndex !== -1) {
-        historyStack.push(JSON.stringify(excelData)); // Save current state
+        // Save current state before making changes
+        editHistory.push({ ...excelData[rowIndex] });
+        
         formInputs.forEach(input => {
             excelData[rowIndex][input.dataset.field] = input.value;
         });
