@@ -9,6 +9,9 @@ let originalWorkbook = null;
 let lastTreeData = null;
 let historyStack = []; // Add history stack
 let editHistory = [];
+let savedTreeState = null; // Add this near other global variables
+let savedJsTreeState = null;
+let isInSearchOrOrphanView = false;
 
 document.addEventListener('DOMContentLoaded', function() {
     initializeFileLoader();
@@ -21,6 +24,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeCollapsibleSections();
     initializeUndoButton();
     initializeOrphanSearch();
+    initializeModals();
 });
 
 function initializeUndoButton() {
@@ -172,18 +176,44 @@ function clearNewRecordForm() {
     document.getElementById('newDescription').value = '';
 }
 
+// Replace the initializeSearch function
 function initializeSearch() {
     const searchButton = document.getElementById('searchButton');
     const clearButton = document.getElementById('clearSearch');
     const searchInput = document.getElementById('searchInput');
 
     searchButton.addEventListener('click', performSearch);
-    clearButton.addEventListener('click', clearSearch);
+    clearButton.addEventListener('click', handleBackButton);
     searchInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             performSearch();
         }
     });
+}
+
+// Modify the handleBackButton function
+function handleBackButton() {
+    if (isInSearchOrOrphanView && savedTreeState) {
+        // Restore previous tree data and state
+        $('#treeView').jstree(true).settings.core.data = savedTreeState;
+        $('#treeView').jstree(true).refresh();
+        $('#treeView').on('refresh.jstree', function() {
+            $('#treeView').jstree(true).set_state(savedJsTreeState);
+            $('#treeView').off('refresh.jstree');
+        });
+        
+        // Reset states
+        document.getElementById('orphanSearchContainer').style.display = 'none';
+        document.getElementById('clearSearch').textContent = 'Reset View';
+        window.currentOrphans = null;
+        isInSearchOrOrphanView = false;
+        savedTreeState = null;
+        savedJsTreeState = null;
+    } else {
+        // Normal reset behavior
+        updateTreeView();
+    }
+    document.getElementById('searchInput').value = '';
 }
 
 function performSearch() {
@@ -213,9 +243,21 @@ function performSearch() {
         return;
     }
 
-    const treeData = buildTreeFromSearchResults(searchResults);
-    $('#treeView').jstree(true).settings.core.data = treeData;
-    $('#treeView').jstree(true).refresh();
+    if (searchResults.length > 0) {
+        if (!isInSearchOrOrphanView) {
+            savedTreeState = $('#treeView').jstree(true).settings.core.data;
+            savedJsTreeState = $('#treeView').jstree(true).get_state();
+            isInSearchOrOrphanView = true;
+            document.getElementById('clearSearch').textContent = 'Back';
+        }
+        const treeData = buildTreeFromSearchResults(searchResults);
+        $('#searchResultsTree').jstree(true).settings.core.data = treeData;
+        $('#searchResultsTree').jstree(true).refresh();
+        const modal = document.getElementById('searchResultsModal');
+        const modalContent = modal.querySelector('.modal-content');
+        resetModalPosition(modalContent);
+        modal.classList.add('show');
+    }
 }
 
 function buildTreeFromSearchResults(results) {
@@ -223,7 +265,7 @@ function buildTreeFromSearchResults(results) {
     const processedNodes = new Set();
     const parentChildMap = new Map();
 
-    results.forEach(row => {
+    results.forEach((row, index) => {
         const parentValue = row[columnMappings.parent];
         const childValue = row[columnMappings.child];
         const description = columnMappings.description ? row[columnMappings.description] : '';
@@ -232,11 +274,12 @@ function buildTreeFromSearchResults(results) {
             if (!parentChildMap.has(parentValue)) {
                 parentChildMap.set(parentValue, []);
             }
-            parentChildMap.get(parentValue).push({ child: childValue, description });
+            // Include row index
+            parentChildMap.get(parentValue).push({ child: childValue, description, rowIndex: index });
         }
     });
 
-    function addNode(value, isParent = true, level = 0) {
+    function addNode(value, isParent = true, level = 0, rowIndex = null) {
         if (processedNodes.has(value)) return null;
         if (!value) return null;
         
@@ -245,15 +288,16 @@ function buildTreeFromSearchResults(results) {
         const icons = ['fas fa-folder', 'fas fa-folder-open', 'fas fa-toolbox'];
         const node = {
             text: value,
-            id: value,
+            id: `${value}_${level}`,
             children: [],
+            data: { rowIndex: rowIndex }, // Store row index
             state: { opened: true },
             icon: isParent ? icons[0] : icons[2]
         };
 
         if (parentChildMap.has(value)) {
-            parentChildMap.get(value).forEach(({ child, description }) => {
-                const childNode = addNode(child, false, level + 1);
+            parentChildMap.get(value).forEach(({ child, description, rowIndex }) => {
+                const childNode = addNode(child, false, level + 1, rowIndex);
                 if (childNode) {
                     childNode.text = child + (description ? ` - ${description}` : '');
                     node.children.push(childNode);
@@ -278,9 +322,19 @@ function buildTreeFromSearchResults(results) {
 
 function clearSearch() {
     document.getElementById('searchInput').value = '';
-    document.getElementById('orphanSearchContainer').style.display = 'none';
-    window.currentOrphans = null; // Clear orphans data
-    updateTreeView();
+    
+    if (document.getElementById('orphanSearchContainer').style.display === 'block') {
+        // If we're in orphan view, restore the normal hierarchy
+        document.getElementById('orphanSearchContainer').style.display = 'none';
+        window.currentOrphans = null;
+        if (savedTreeState) {
+            $('#treeView').jstree(true).settings.core.data = savedTreeState;
+            $('#treeView').jstree(true).refresh();
+        }
+    } else {
+        // Normal search clear behavior
+        updateTreeView();
+    }
 }
 
 function populateColumnsList() {
@@ -405,11 +459,23 @@ function updateEditForm(node) {
     }
 
     editForm.innerHTML = '';
-    const nodeData = findNodeData(node.id); // Use node.id instead of node.text
-    
+    const rowIndex = node.data.rowIndex;
+
+    if (rowIndex === undefined || rowIndex === null) {
+        editForm.innerHTML = '<p class="placeholder-text">Unable to find data for the selected node.</p>';
+        editActions.style.display = 'none';
+        return;
+    }
+
+    const nodeData = excelData[rowIndex];
+
     // Save initial state to edit history
     if (nodeData) {
         editHistory = [{ ...nodeData }];
+    } else {
+        editForm.innerHTML = '<p class="placeholder-text">No data associated with this node.</p>';
+        editActions.style.display = 'none';
+        return;
     }
 
     const allColumns = Object.keys(excelData[0]);
@@ -433,9 +499,10 @@ function updateEditForm(node) {
     editActions.style.display = 'flex';
 }
 
-function findNodeData(nodeId) {
+function findNodeData(nodeText) {
     return excelData.find(row => {
-        return row[columnMappings.child] === nodeId;
+        return row[columnMappings.parent] === nodeText || 
+               row[columnMappings.child] === nodeText;
     });
 }
 
@@ -473,20 +540,21 @@ function updateTreeView() {
     const processedNodes = new Set();
     const parentChildMap = new Map();
 
-    excelData.forEach(row => {
+    excelData.forEach((row, index) => {
         const parentValue = row[columnMappings.parent];
         const childValue = row[columnMappings.child];
         const description = columnMappings.description ? row[columnMappings.description] : '';
 
-        if (parentValue && parentValue !== childValue) { // Ensure parent is not the same as child
+        if (parentValue) {
             if (!parentChildMap.has(parentValue)) {
                 parentChildMap.set(parentValue, []);
             }
-            parentChildMap.get(parentValue).push({ child: childValue, description });
+            // Include row index
+            parentChildMap.get(parentValue).push({ child: childValue, description, rowIndex: index });
         }
     });
 
-    function addNode(value, isParent = true, level = 0) {
+    function addNode(value, isParent = true, level = 0, rowIndex = null) {
         if (processedNodes.has(value)) return null;
         if (!value) return null;
         
@@ -495,14 +563,15 @@ function updateTreeView() {
         const icons = ['fas fa-folder', 'fas fa-folder-open', 'fas fa-toolbox'];
         const node = {
             text: value,
-            id: value,
+            id: `${value}_${level}`,
             children: [],
+            data: { rowIndex: rowIndex }, // Store row index
             icon: isParent ? icons[0] : icons[2]
         };
 
         if (parentChildMap.has(value)) {
-            parentChildMap.get(value).forEach(({ child, description }) => {
-                const childNode = addNode(child, false, level + 1);
+            parentChildMap.get(value).forEach(({ child, description, rowIndex }) => {
+                const childNode = addNode(child, false, level + 1, rowIndex);
                 if (childNode) {
                     childNode.text = child + (description ? ` - ${description}` : '');
                     node.children.push(childNode);
@@ -526,6 +595,7 @@ function updateTreeView() {
     $('#treeView').jstree(true).refresh();
 }
 
+// Modify the showOrphanRecords function
 function showOrphanRecords() {
     if (!excelData || !columnMappings.parent || !columnMappings.child) {
         alert('Please load data and map the Parent and Child columns first');
@@ -545,14 +615,23 @@ function showOrphanRecords() {
 
     // Store orphans for searching
     window.currentOrphans = orphans;
-    displayOrphanRecords(orphans);
 
-    if (orphans.length > 0) {
-        const firstOrphan = orphans[0];
-        updateEditForm({ text: firstOrphan[columnMappings.child] });
-    }
+    // Display orphans in modal
+    const treeData = orphans.map((row, index) => ({
+        text: row[columnMappings.child] + 
+              (columnMappings.description && row[columnMappings.description] ? 
+               ` - ${row[columnMappings.description]}` : ''),
+        id: row[columnMappings.child],
+        data: { rowIndex: index },
+        icon: 'fas fa-exclamation-circle'
+    }));
 
-    // Show orphan search box
+    $('#orphanRecordsTree').jstree(true).settings.core.data = treeData;
+    $('#orphanRecordsTree').jstree(true).refresh();
+    const modal = document.getElementById('orphanRecordsModal');
+    const modalContent = modal.querySelector('.modal-content');
+    resetModalPosition(modalContent);
+    modal.classList.add('show');
     document.getElementById('orphanSearchContainer').style.display = 'block';
 }
 
@@ -582,7 +661,17 @@ function searchOrphans() {
         return childMatch || descMatch;
     });
 
-    displayOrphanRecords(filteredOrphans);
+    const treeData = filteredOrphans.map((row, index) => ({
+        text: row[columnMappings.child] + 
+              (columnMappings.description && row[columnMappings.description] ? 
+               ` - ${row[columnMappings.description]}` : ''),
+        id: row[columnMappings.child],
+        data: { rowIndex: window.currentOrphans.indexOf(row) },
+        icon: 'fas fa-exclamation-circle'
+    }));
+
+    $('#orphanRecordsTree').jstree(true).settings.core.data = treeData;
+    $('#orphanRecordsTree').jstree(true).refresh();
 }
 
 function clearOrphanSearch() {
@@ -614,4 +703,118 @@ function saveChanges() {
     XLSX.utils.book_append_sheet(wb, ws, "Updated Data");
     
     XLSX.writeFile(wb, 'updated_hierarchy.xlsx');
+}
+
+// Add these functions near the top with other initializations
+// Modify the initializeModals function to setup tree node selection
+function initializeModals() {
+    document.getElementById('closeSearchResults').addEventListener('click', () => {
+        document.getElementById('searchResultsModal').classList.remove('show');
+    });
+    
+    document.getElementById('closeOrphanRecords').addEventListener('click', () => {
+        document.getElementById('orphanRecordsModal').classList.remove('show');
+        document.getElementById('orphanSearchContainer').style.display = 'none';
+    });
+
+    // Initialize the trees inside modals with node selection handling
+    $('#searchResultsTree').jstree({
+        core: {
+            themes: { name: 'default', dots: true, icons: true },
+            data: []
+        },
+        plugins: ['wholerow']
+    }).on('select_node.jstree', function(e, data) {
+        const rowIndex = findDataRowIndex(data.node);
+        if (rowIndex !== -1) {
+            updateEditForm({ data: { rowIndex: rowIndex } });
+        }
+    });
+
+    $('#orphanRecordsTree').jstree({
+        core: {
+            themes: { name: 'default', dots: true, icons: true },
+            data: []
+        },
+        plugins: ['wholerow']
+    }).on('select_node.jstree', function(e, data) {
+        const rowIndex = findDataRowIndex(data.node);
+        if (rowIndex !== -1) {
+            updateEditForm({ data: { rowIndex: rowIndex } });
+        }
+    });
+
+    initializeDraggableModals();
+}
+
+// Add helper function to find data row index
+function findDataRowIndex(node) {
+    const nodeText = node.text.split(' - ')[0]; // Get the text before any description
+    return excelData.findIndex(row => 
+        row[columnMappings.parent] === nodeText || 
+        row[columnMappings.child] === nodeText
+    );
+}
+
+// Replace the initializeDraggableModals function
+function initializeDraggableModals() {
+    const modals = document.querySelectorAll('.modal-content');
+    
+    modals.forEach(modal => {
+        const header = modal.querySelector('.modal-header');
+        let isDragging = false;
+        let currentX = 0;
+        let currentY = 0;
+        let initialX = 0;
+        let initialY = 0;
+
+        header.addEventListener('mousedown', dragStart);
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('mouseup', dragEnd);
+
+        function dragStart(e) {
+            if (e.target === header) {
+                const rect = modal.getBoundingClientRect();
+                initialX = e.clientX - rect.left;
+                initialY = e.clientY - rect.top;
+                
+                isDragging = true;
+                modal.classList.add('dragging');
+            }
+        }
+
+        function drag(e) {
+            if (!isDragging) return;
+
+            e.preventDefault();
+            currentX = e.clientX - initialX;
+            currentY = e.clientY - initialY;
+
+            // Keep modal within viewport bounds
+            const rect = modal.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
+            if (currentX < 0) currentX = 0;
+            if (currentY < 0) currentY = 0;
+            if (currentX + rect.width > viewportWidth) currentX = viewportWidth - rect.width;
+            if (currentY + rect.height > viewportHeight) currentY = viewportHeight - rect.height;
+
+            modal.style.left = `${currentX}px`;
+            modal.style.top = `${currentY}px`;
+            modal.style.transform = 'none';
+        }
+
+        function dragEnd() {
+            isDragging = false;
+            modal.classList.remove('dragging');
+        }
+    });
+}
+
+// Update the resetModalPosition function
+function resetModalPosition(modalContent) {
+    modalContent.style.left = '50%';
+    modalContent.style.top = '50%';
+    modalContent.style.transform = 'translate(-50%, -50%)';
 }

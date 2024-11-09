@@ -54,7 +54,7 @@
                     <div class="search-box">
                         <input type="text" id="searchInput" placeholder="Search in hierarchy...">
                         <button id="searchButton" class="primary-button">Search</button>
-                        <button id="clearSearch" class="secondary-button">Reset View</button>
+                        <button id="clearSearch" class="secondary-button">Back</button>
                     </div>
                     <div class="search-options">
                         <label>
@@ -175,6 +175,36 @@
                 <div class="modal-actions">
                     <button id="saveNewRecord" class="primary-button">Save Record</button>
                     <button id="cancelNewRecord" class="secondary-button">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Results Modal -->
+    <div id="searchResultsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Search Results</h3>
+            </div>
+            <div class="modal-body">
+                <div id="searchResultsTree"></div>
+                <div class="modal-actions">
+                    <button id="closeSearchResults" class="secondary-button">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Orphan Records Modal -->
+    <div id="orphanRecordsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Orphan Records</h3>
+            </div>
+            <div class="modal-body">
+                <div id="orphanRecordsTree"></div>
+                <div class="modal-actions">
+                    <button id="closeOrphanRecords" class="secondary-button">Close</button>
                 </div>
             </div>
         </div>

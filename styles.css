@@ -249,20 +249,48 @@ body {
     z-index: 1000;
 }
 
+/* Add/modify modal styles */
 .modal-content {
-    position: relative;
+    position: absolute; /* Change from fixed to absolute */
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 800px;
+    width: 90%;
+    max-height: 80vh;
     background-color: #fff;
-    margin: 10% auto;
-    padding: 20px;
-    width: 500px;
     border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    transform: translateY(-20px);
-    transition: transform 0.3s ease;
+    overflow: hidden; /* Changed from overflow-y: auto */
+}
+
+.modal-header {
+    padding: 15px 20px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    cursor: move;
+    user-select: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+}
+
+.modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    max-height: calc(80vh - 130px); /* Account for header and footer */
 }
 
 .modal.show .modal-content {
     transform: translateY(0);
+}
+
+/* Add styles for dragging state */
+.modal-content.dragging {
+    transition: none;
+    cursor: move;
 }
 
 .modal h3 {
@@ -589,3 +617,15 @@ input[type="file"] {
 }
 
 /* ...existing code... */
+
+/* Add these new styles */
+#searchResultsTree,
+#orphanRecordsTree {
+    height: 400px;
+    overflow: auto;
+    margin: 20px 0;
+    padding: 10px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    background: #fff;
+}
