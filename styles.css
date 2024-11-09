@@ -154,6 +154,7 @@ body {
     display: flex;
     flex-direction: column;
     overflow-y: auto;
+    z-index: 1001; /* Ensure edit panel is above the modal */
 }
 
 .logo-space {
@@ -174,6 +175,46 @@ body {
     overflow-y: auto;
     padding: 20px;
     border-bottom: 1px solid #dee2e6;
+    background-color: #ffffff;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    border: 1px solid #dee2e6;
+}
+
+.edit-form-container.active {
+    background-color: #ffffff;
+    border: 1px solid #2196f3;
+    box-shadow: 0 2px 4px rgba(33, 150, 243, 0.1);
+}
+
+.edit-input.active {
+    border-color: #dee2e6;
+    background-color: #ffffff !important;
+    color: #212529;
+    opacity: 1;
+}
+
+.edit-input.active:focus {
+    border-color: #2196f3;
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+.edit-form-container.active #editPanelTitle {
+    color: #2196f3;
+}
+
+.edit-form .form-group input {
+    background-color: #ffffff !important;
+    color: #212529 !important;
+    cursor: text !important;
+    opacity: 1 !important;
+    border: 1px solid #dee2e6;
+    pointer-events: auto !important;
+}
+
+.edit-form .form-group input:focus {
+    border-color: #2196f3;
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
 }
 
 .edit-panel-footer {
@@ -186,6 +227,9 @@ body {
     margin-top: 10px;
     padding-bottom: 10px;
     border-bottom: 1px solid #dee2e6;
+    color: #212529;
+    font-weight: 600;
+    margin-bottom: 15px;
 }
 
 /* Search styles */
@@ -254,7 +298,8 @@ body {
     background-color: #fff;
     margin: 10% auto;
     padding: 20px;
-    width: 500px;
+    width: 600px; /* Make the modal wider to accommodate the edit panel */
+    max-width: 90%;
     border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     transform: translateY(-20px);
@@ -297,9 +342,10 @@ body {
 
 .form-group label {
     font-weight: 600;
-    color: #495057;
+    color: #212529; /* Darker color for better visibility */
     font-size: 0.9em;
     margin-bottom: 4px;
+    opacity: 1;
 }
 
 .form-group input {
@@ -307,6 +353,36 @@ body {
     border: 1px solid #dee2e6;
     border-radius: 4px;
     font-size: 14px;
+    background-color: #ffffff !important;
+    color: #212529 !important;
+    opacity: 1 !important;
+    cursor: text !important;
+    width: 100%;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #2196f3;
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+    background-color: #ffffff !important;
+}
+
+.form-group input:hover {
+    border-color: #90caf9;
+    background-color: #ffffff !important;
+}
+
+.edit-form-container.active .form-group input {
+    background-color: #ffffff !important;
+    color: #212529 !important;
+    cursor: text !important;
+    opacity: 1 !important;
+}
+
+.form-group input:disabled {
+    background-color: #e9ecef;
+    cursor: not-allowed;
+    opacity: 0.7;
 }
 
 .form-group input:focus {
@@ -317,6 +393,14 @@ body {
 
 .form-group input:hover {
     border-color: #90caf9;
+}
+
+/* Remove/override any disabled states */
+.form-group input:disabled,
+.form-group input[readonly] {
+    background-color: #ffffff !important;
+    opacity: 1 !important;
+    cursor: text !important;
 }
 
 .edit-actions {
@@ -343,6 +427,9 @@ body {
     text-align: center;
     padding: 20px;
     font-style: italic;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    margin: 10px 0;
 }
 
 .drop-target {
@@ -586,6 +673,75 @@ input[type="file"] {
     background: #f8f9fa;
     border-radius: 6px;
     border: 1px solid #dee2e6;
+}
+
+/* ...existing code... */
+
+.orphans-list {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 15px;
+}
+
+.orphan-item {
+    padding: 10px;
+    border-bottom: 1px solid #dee2e6;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.orphan-item:last-child {
+    border-bottom: none;
+}
+
+.orphan-item:hover {
+    background-color: #f8f9fa;
+}
+
+.orphan-item i {
+    color: #ffc107;
+}
+
+/* ...existing code... */
+
+.orphan-item.selected {
+    background-color: #e3f2fd;
+    border-left: 4px solid #2196f3;
+    font-weight: 500;
+}
+
+.orphan-item.selected i {
+    color: #2196f3;
+}
+
+/* ...existing code... */
+
+/* Revert orphan records modal styles to original */
+#orphanRecordsModal {
+    display: none;
+    /* ...existing original styles... */
+}
+
+#orphanRecordsModal.show {
+    display: block;
+    /* ...existing original styles... */
+}
+
+/* Ensure main-content occupies full width when orphan modal is not active */
+.container.with-orphan-modal .main-content {
+    margin-left: 0; /* Reset margin */
+}
+
+/* Adjust TreeView styling if necessary */
+#treeView {
+    height: 100%;
+    /* ...existing original styles... */
 }
 
 /* ...existing code... */

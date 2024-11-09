@@ -420,41 +420,56 @@ function undoEditChanges() {
 function updateEditForm(node) {
     const editForm = document.getElementById('editForm');
     const editActions = document.querySelector('.edit-actions');
+    const editPanelTitle = document.getElementById('editPanelTitle');
+    const editFormContainer = document.querySelector('.edit-form-container');
     
     if (!node || !excelData) {
-        editHistory = []; // Clear edit history for new node
+        editHistory = [];
         editForm.innerHTML = '<p class="placeholder-text">Select a node in the tree to edit its values</p>';
         editActions.style.display = 'none';
+        editPanelTitle.textContent = 'Edit Record';
+        editFormContainer.classList.remove('active');
         return;
     }
 
+    // Always make edit panel active and editable
+    editFormContainer.classList.add('active');
+    editActions.style.display = 'flex';
     editForm.innerHTML = '';
-    const nodeData = findNodeData(node.text.split(' - ')[0]);
+
+    // Use node.data for orphan records, otherwise find the data
+    const nodeData = node.data || findNodeData(node.text.split(' - ')[0]);
     
-    // Save initial state to edit history
+    editPanelTitle.textContent = node.isOrphan ? 
+        `Edit Orphan Record: ${node.text}` : 
+        `Edit Record: ${node.text}`;
+    
     if (nodeData) {
         editHistory = [{ ...nodeData }];
+        
+        const allColumns = Object.keys(excelData[0]);
+        allColumns.forEach(field => {
+            const formGroup = document.createElement('div');
+            formGroup.className = 'form-group';
+            
+            const label = document.createElement('label');
+            label.textContent = field;
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = nodeData[field] || '';
+            input.dataset.field = field;
+            input.className = 'edit-input active';
+            
+            // Ensure input is always editable
+            input.readOnly = false;
+            input.disabled = false;
+            
+            formGroup.appendChild(label);
+            formGroup.appendChild(input);
+            editForm.appendChild(formGroup);
+        });
     }
-
-    const allColumns = Object.keys(excelData[0]);
-    allColumns.forEach(field => {
-        const formGroup = document.createElement('div');
-        formGroup.className = 'form-group';
-        
-        const label = document.createElement('label');
-        label.textContent = field;
-        
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = nodeData ? nodeData[field] || '' : '';
-        input.dataset.field = field;
-        
-        formGroup.appendChild(label);
-        formGroup.appendChild(input);
-        editForm.appendChild(formGroup);
-    });
-    
-    editActions.style.display = 'flex';
 }
 
 function findNodeData(nodeText) {
@@ -570,61 +585,68 @@ function showOrphanRecords() {
 
     // Store orphans for searching
     window.currentOrphans = orphans;
-    displayOrphanRecords(orphans);
-
-    if (orphans.length > 0) {
-        const firstOrphan = orphans[0];
-        updateEditForm({ text: firstOrphan[columnMappings.child] });
-    }
-
-    // Show orphan search box
-    document.getElementById('orphanSearchContainer').style.display = 'block';
+    displayOrphanRecordsInModal(orphans);
 }
 
-function displayOrphanRecords(orphans) {
-    const treeData = orphans.map(row => ({
-        text: row[columnMappings.child] + 
-              (columnMappings.description && row[columnMappings.description] ? 
-               ` - ${row[columnMappings.description]}` : ''),
-        id: row[columnMappings.child],
-        type: 'orphan',
-        classes: 'orphan-record',
-        icon: 'fas fa-exclamation-circle'
-    }));
+function displayOrphanRecordsInModal(orphans) {
+    const modal = document.getElementById('orphanRecordsModal');
+    const orphansList = document.getElementById('orphansList');
+    const editFormContainer = document.querySelector('.edit-form-container');
+    
+    orphansList.innerHTML = '';
 
-    $('#treeView').jstree(true).settings.core.data = treeData;
-    $('#treeView').jstree(true).refresh();
-}
-
-function searchOrphans() {
-    const searchTerm = document.getElementById('orphanSearchInput').value.toLowerCase();
-    if (!window.currentOrphans) return;
-
-    const filteredOrphans = window.currentOrphans.filter(row => {
-        const childMatch = row[columnMappings.child].toString().toLowerCase().includes(searchTerm);
-        const descMatch = columnMappings.description && row[columnMappings.description] ?
-            row[columnMappings.description].toString().toLowerCase().includes(searchTerm) : false;
-        return childMatch || descMatch;
+    orphans.forEach(row => {
+        const item = document.createElement('div');
+        item.className = 'orphan-item';
+        item.innerHTML = `
+            <i class="fas fa-exclamation-circle"></i>
+            <span>${row[columnMappings.child]}${columnMappings.description ? 
+                ` - ${row[columnMappings.description] || ''}` : ''}</span>
+        `;
+        
+        item.addEventListener('click', () => {
+            // Set the selected node and update edit form
+            selectedNode = { 
+                text: row[columnMappings.child],
+                data: row,
+                isOrphan: true  // Flag to indicate this is an orphan record
+            };
+            
+            // Ensure edit panel is active
+            editFormContainer.classList.add('active');
+            updateEditForm(selectedNode);
+            
+            // Highlight the selected orphan record
+            orphansList.querySelectorAll('.orphan-item').forEach(i => i.classList.remove('selected'));
+            item.classList.add('selected');
+        });
+        
+        orphansList.appendChild(item);
     });
 
-    displayOrphanRecords(filteredOrphans);
+    modal.classList.add('show');
 }
 
-function clearOrphanSearch() {
-    document.getElementById('orphanSearchInput').value = '';
-    if (window.currentOrphans) {
-        displayOrphanRecords(window.currentOrphans);
-    }
-}
-
-// Add to initialization
 function initializeOrphanSearch() {
-    document.getElementById('orphanSearchButton').addEventListener('click', searchOrphans);
-    document.getElementById('orphanSearchClear').addEventListener('click', clearOrphanSearch);
-    document.getElementById('orphanSearchInput').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            searchOrphans();
-        }
+    const closeButton = document.getElementById('closeOrphanModal');
+    const searchInput = document.getElementById('orphanModalSearch');
+
+    closeButton.addEventListener('click', () => {
+        document.getElementById('orphanRecordsModal').classList.remove('show');
+    });
+
+    searchInput.addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        if (!window.currentOrphans) return;
+
+        const filteredOrphans = window.currentOrphans.filter(row => {
+            const childMatch = row[columnMappings.child].toString().toLowerCase().includes(searchTerm);
+            const descMatch = columnMappings.description && row[columnMappings.description] ?
+                row[columnMappings.description].toString().toLowerCase().includes(searchTerm) : false;
+            return childMatch || descMatch;
+        });
+
+        displayOrphanRecordsInModal(filteredOrphans);
     });
 }
 
