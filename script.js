@@ -408,6 +408,28 @@ function initializeTreeView() {
     }).on('select_node.jstree', function(e, data) {
         selectedNode = data.node;
         updateEditForm(selectedNode);
+    }).on('move_node.jstree', function(e, data) {
+        // Handle node movement
+        const movedNode = data.node;
+        const newParent = data.parent === '#' ? '' : data.instance.get_node(data.parent).text.split(' - ')[0];
+        const nodeText = movedNode.text.split(' - ')[0];
+        
+        // Save current state before updating
+        historyStack.push(JSON.stringify(excelData));
+        
+        // Find and update the record in excelData
+        const recordIndex = excelData.findIndex(row => 
+            row[columnMappings.child] === nodeText ||
+            row[columnMappings.parent] === nodeText
+        );
+
+        if (recordIndex !== -1) {
+            // Update the parent column
+            excelData[recordIndex][columnMappings.parent] = newParent;
+            
+            // Refresh the tree to reflect changes
+            updateTreeView();
+        }
     });
 
     // Add expand/collapse handlers
