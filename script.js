@@ -718,7 +718,7 @@ function initializeModals() {
     });
 
     // Initialize the trees inside modals with node selection handling
-    $('#searchResultsTree').jstree({
+    $('#searchResultsTree, #orphanRecordsTree').jstree({
         core: {
             themes: { name: 'default', dots: true, icons: true },
             data: []
@@ -727,19 +727,10 @@ function initializeModals() {
     }).on('select_node.jstree', function(e, data) {
         const rowIndex = findDataRowIndex(data.node);
         if (rowIndex !== -1) {
-            updateEditForm({ data: { rowIndex: rowIndex } });
-        }
-    });
-
-    $('#orphanRecordsTree').jstree({
-        core: {
-            themes: { name: 'default', dots: true, icons: true },
-            data: []
-        },
-        plugins: ['wholerow']
-    }).on('select_node.jstree', function(e, data) {
-        const rowIndex = findDataRowIndex(data.node);
-        if (rowIndex !== -1) {
+            selectedNode = data.node;
+            const rightPanel = document.getElementById('rightPanel');
+            rightPanel.style.display = 'flex';
+            rightPanel.style.zIndex = '1001'; // Ensure it's above the modal overlay
             updateEditForm({ data: { rowIndex: rowIndex } });
         }
     });
