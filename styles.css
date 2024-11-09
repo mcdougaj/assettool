@@ -639,3 +639,27 @@ input[type="file"] {
     border-radius: 6px;
     background: #fff;
 }
+
+/* Add Modal Search Box Styles */
+.modal-search-box {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 15px;
+    padding: 0 10px;
+}
+
+.modal-search-box input {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.modal-search-box input:focus {
+    outline: none;
+    border-color: #2196f3;
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+/* ...existing code... */

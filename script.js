@@ -723,7 +723,12 @@ function initializeModals() {
             themes: { name: 'default', dots: true, icons: true },
             data: []
         },
-        plugins: ['wholerow']
+        plugins: ['wholerow', 'search'],
+        search: {
+            show_only_matches: true,
+            show_only_matches_children: true,
+            close_opened_onclear: false
+        }
     }).on('select_node.jstree', function(e, data) {
         const rowIndex = findDataRowIndex(data.node);
         if (rowIndex !== -1) {
@@ -733,6 +738,30 @@ function initializeModals() {
             rightPanel.style.zIndex = '1001'; // Ensure it's above the modal overlay
             updateEditForm({ data: { rowIndex: rowIndex } });
         }
+    });
+
+    // Add modal search functionality
+    const modalSearchInput = document.getElementById('modalSearchInput');
+    const modalSearchClear = document.getElementById('modalSearchClear');
+    const modalOrphanSearchInput = document.getElementById('modalOrphanSearchInput');
+    const modalOrphanSearchClear = document.getElementById('modalOrphanSearchClear');
+
+    modalSearchInput.addEventListener('input', function() {
+        $('#searchResultsTree').jstree(true).search(this.value);
+    });
+
+    modalSearchClear.addEventListener('click', function() {
+        modalSearchInput.value = '';
+        $('#searchResultsTree').jstree(true).clear_search();
+    });
+
+    modalOrphanSearchInput.addEventListener('input', function() {
+        $('#orphanRecordsTree').jstree(true).search(this.value);
+    });
+
+    modalOrphanSearchClear.addEventListener('click', function() {
+        modalOrphanSearchInput.value = '';
+        $('#orphanRecordsTree').jstree(true).clear_search();
     });
 
     initializeDraggableModals();
