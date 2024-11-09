@@ -9,9 +9,6 @@ let originalWorkbook = null;
 let lastTreeData = null;
 let historyStack = []; // Add history stack
 let editHistory = [];
-let savedTreeState = null; // Add this near other global variables
-let savedJsTreeState = null;
-let isInSearchOrOrphanView = false;
 
 document.addEventListener('DOMContentLoaded', function() {
     initializeFileLoader();
@@ -176,44 +173,18 @@ function clearNewRecordForm() {
     document.getElementById('newDescription').value = '';
 }
 
-// Replace the initializeSearch function
 function initializeSearch() {
     const searchButton = document.getElementById('searchButton');
     const clearButton = document.getElementById('clearSearch');
     const searchInput = document.getElementById('searchInput');
 
     searchButton.addEventListener('click', performSearch);
-    clearButton.addEventListener('click', handleBackButton);
+    clearButton.addEventListener('click', clearSearch);
     searchInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             performSearch();
         }
     });
-}
-
-// Modify the handleBackButton function
-function handleBackButton() {
-    if (isInSearchOrOrphanView && savedTreeState) {
-        // Restore previous tree data and state
-        $('#treeView').jstree(true).settings.core.data = savedTreeState;
-        $('#treeView').jstree(true).refresh();
-        $('#treeView').on('refresh.jstree', function() {
-            $('#treeView').jstree(true).set_state(savedJsTreeState);
-            $('#treeView').off('refresh.jstree');
-        });
-        
-        // Reset states
-        document.getElementById('orphanSearchContainer').style.display = 'none';
-        document.getElementById('clearSearch').textContent = 'Reset View';
-        window.currentOrphans = null;
-        isInSearchOrOrphanView = false;
-        savedTreeState = null;
-        savedJsTreeState = null;
-    } else {
-        // Normal reset behavior
-        updateTreeView();
-    }
-    document.getElementById('searchInput').value = '';
 }
 
 function performSearch() {
@@ -223,6 +194,11 @@ function performSearch() {
     const searchDescription = document.getElementById('searchDescription').checked;
 
     if (!searchTerm || !excelData) return;
+
+    // Store the original tree data if not already stored
+    if (!window.originalTreeData) {
+        window.originalTreeData = lastTreeData;
+    }
 
     const searchResults = excelData.filter(row => {
         let match = false;
@@ -243,29 +219,30 @@ function performSearch() {
         return;
     }
 
-    if (searchResults.length > 0) {
-        if (!isInSearchOrOrphanView) {
-            savedTreeState = $('#treeView').jstree(true).settings.core.data;
-            savedJsTreeState = $('#treeView').jstree(true).get_state();
-            isInSearchOrOrphanView = true;
-            document.getElementById('clearSearch').textContent = 'Back';
-        }
-        const treeData = buildTreeFromSearchResults(searchResults);
-        $('#searchResultsTree').jstree(true).settings.core.data = treeData;
-        $('#searchResultsTree').jstree(true).refresh();
-        const modal = document.getElementById('searchResultsModal');
-        const modalContent = modal.querySelector('.modal-content');
-        resetModalPosition(modalContent);
-        modal.classList.add('show');
+    const treeData = buildTreeFromSearchResults(searchResults);
+
+    // Update the tree view with search results
+    $('#treeView').jstree(true).settings.core.data = treeData;
+    $('#treeView').jstree(true).refresh();
+}
+
+function clearSearch() {
+    document.getElementById('searchInput').value = '';
+    // Restore the original tree data
+    if (window.originalTreeData) {
+        $('#treeView').jstree(true).settings.core.data = window.originalTreeData;
+        $('#treeView').jstree(true).refresh();
+        window.originalTreeData = null;
     }
 }
 
 function buildTreeFromSearchResults(results) {
+    // Build a tree structure from the search results
     const treeData = [];
     const processedNodes = new Set();
     const parentChildMap = new Map();
 
-    results.forEach((row, index) => {
+    results.forEach(row => {
         const parentValue = row[columnMappings.parent];
         const childValue = row[columnMappings.child];
         const description = columnMappings.description ? row[columnMappings.description] : '';
@@ -274,34 +251,27 @@ function buildTreeFromSearchResults(results) {
             if (!parentChildMap.has(parentValue)) {
                 parentChildMap.set(parentValue, []);
             }
-            // Include row index
-            parentChildMap.get(parentValue).push({ child: childValue, description, rowIndex: index });
+            parentChildMap.get(parentValue).push({ child: childValue, description });
         }
     });
 
-    function addNode(value, isParent = true, level = 0, rowIndex = null) {
+    function addNode(value) {
         if (processedNodes.has(value)) return null;
-        if (!value) return null;
-        
         processedNodes.add(value);
 
-        const icons = ['fas fa-folder', 'fas fa-folder-open', 'fas fa-toolbox'];
         const node = {
             text: value,
-            id: `${value}_${level}`,
+            id: value,
             children: [],
-            data: { rowIndex: rowIndex }, // Store row index
-            state: { opened: true },
-            icon: isParent ? icons[0] : icons[2]
+            icon: 'fas fa-folder'
         };
 
         if (parentChildMap.has(value)) {
-            parentChildMap.get(value).forEach(({ child, description, rowIndex }) => {
-                const childNode = addNode(child, false, level + 1, rowIndex);
+            parentChildMap.get(value).forEach(({ child, description }) => {
+                const childNode = addNode(child);
                 if (childNode) {
                     childNode.text = child + (description ? ` - ${description}` : '');
                     node.children.push(childNode);
-                    node.icon = icons[1]; // Change to open folder if it has children
                 }
             });
         }
@@ -318,23 +288,6 @@ function buildTreeFromSearchResults(results) {
     });
 
     return treeData;
-}
-
-function clearSearch() {
-    document.getElementById('searchInput').value = '';
-    
-    if (document.getElementById('orphanSearchContainer').style.display === 'block') {
-        // If we're in orphan view, restore the normal hierarchy
-        document.getElementById('orphanSearchContainer').style.display = 'none';
-        window.currentOrphans = null;
-        if (savedTreeState) {
-            $('#treeView').jstree(true).settings.core.data = savedTreeState;
-            $('#treeView').jstree(true).refresh();
-        }
-    } else {
-        // Normal search clear behavior
-        updateTreeView();
-    }
 }
 
 function populateColumnsList() {
@@ -395,7 +348,7 @@ function handleDrop(e) {
 function initializeTreeView() {
     $('#treeView').jstree({
         core: {
-            check_callback: true,
+            check_callback: true, // Enable all modifications
             data: [],
             themes: {
                 name: 'default',
@@ -404,31 +357,46 @@ function initializeTreeView() {
                 variant: 'large'
             }
         },
-        plugins: ['dnd', 'wholerow']
-    }).on('select_node.jstree', function(e, data) {
+        plugins: ['dnd', 'wholerow'], // Include 'dnd' plugin for drag-and-drop
+    })
+    .on('select_node.jstree', function(e, data) {
         selectedNode = data.node;
         updateEditForm(selectedNode);
-    }).on('move_node.jstree', function(e, data) {
-        // Handle node movement
-        const movedNode = data.node;
-        const newParent = data.parent === '#' ? '' : data.instance.get_node(data.parent).text.split(' - ')[0];
-        const nodeText = movedNode.text.split(' - ')[0];
-        
-        // Save current state before updating
-        historyStack.push(JSON.stringify(excelData));
-        
-        // Find and update the record in excelData
-        const recordIndex = excelData.findIndex(row => 
-            row[columnMappings.child] === nodeText ||
-            row[columnMappings.parent] === nodeText
+    })
+    .on('move_node.jstree', function(e, data) {
+        // Handle node movement to update parent in excelData
+
+        // Get moved node's text (excluding description)
+        const movedNodeText = data.node.text.split(' - ')[0];
+
+        // Get new parent's text (excluding description)
+        let newParentText;
+        if (data.parent === '#') {
+            // Moved to root level; parent is null or empty
+            newParentText = '';
+        } else {
+            const parentNode = data.instance.get_node(data.parent);
+            newParentText = parentNode.text.split(' - ')[0];
+        }
+
+        // Find the index of the moved node in excelData
+        const rowIndex = excelData.findIndex(row =>
+            row[columnMappings.child] === movedNodeText
         );
 
-        if (recordIndex !== -1) {
-            // Update the parent column
-            excelData[recordIndex][columnMappings.parent] = newParent;
-            
-            // Refresh the tree to reflect changes
+        if (rowIndex !== -1) {
+            // Save current state before making changes
+            historyStack.push(JSON.stringify(excelData));
+
+            // Update the parent field in excelData
+            excelData[rowIndex][columnMappings.parent] = newParentText || null;
+
+            // Refresh the tree view to reflect changes
             updateTreeView();
+
+            // Update the edit form with the moved node
+            selectedNode = data.node;
+            updateEditForm(selectedNode);
         }
     });
 
@@ -481,23 +449,11 @@ function updateEditForm(node) {
     }
 
     editForm.innerHTML = '';
-    const rowIndex = node.data.rowIndex;
-
-    if (rowIndex === undefined || rowIndex === null) {
-        editForm.innerHTML = '<p class="placeholder-text">Unable to find data for the selected node.</p>';
-        editActions.style.display = 'none';
-        return;
-    }
-
-    const nodeData = excelData[rowIndex];
-
+    const nodeData = findNodeData(node.text.split(' - ')[0]);
+    
     // Save initial state to edit history
     if (nodeData) {
         editHistory = [{ ...nodeData }];
-    } else {
-        editForm.innerHTML = '<p class="placeholder-text">No data associated with this node.</p>';
-        editActions.style.display = 'none';
-        return;
     }
 
     const allColumns = Object.keys(excelData[0]);
@@ -562,7 +518,7 @@ function updateTreeView() {
     const processedNodes = new Set();
     const parentChildMap = new Map();
 
-    excelData.forEach((row, index) => {
+    excelData.forEach(row => {
         const parentValue = row[columnMappings.parent];
         const childValue = row[columnMappings.child];
         const description = columnMappings.description ? row[columnMappings.description] : '';
@@ -571,12 +527,11 @@ function updateTreeView() {
             if (!parentChildMap.has(parentValue)) {
                 parentChildMap.set(parentValue, []);
             }
-            // Include row index
-            parentChildMap.get(parentValue).push({ child: childValue, description, rowIndex: index });
+            parentChildMap.get(parentValue).push({ child: childValue, description });
         }
     });
 
-    function addNode(value, isParent = true, level = 0, rowIndex = null) {
+    function addNode(value, isParent = true, level = 0) {
         if (processedNodes.has(value)) return null;
         if (!value) return null;
         
@@ -585,15 +540,14 @@ function updateTreeView() {
         const icons = ['fas fa-folder', 'fas fa-folder-open', 'fas fa-toolbox'];
         const node = {
             text: value,
-            id: `${value}_${level}`,
+            id: value,
             children: [],
-            data: { rowIndex: rowIndex }, // Store row index
             icon: isParent ? icons[0] : icons[2]
         };
 
         if (parentChildMap.has(value)) {
-            parentChildMap.get(value).forEach(({ child, description, rowIndex }) => {
-                const childNode = addNode(child, false, level + 1, rowIndex);
+            parentChildMap.get(value).forEach(({ child, description }) => {
+                const childNode = addNode(child, false, level + 1);
                 if (childNode) {
                     childNode.text = child + (description ? ` - ${description}` : '');
                     node.children.push(childNode);
@@ -617,7 +571,6 @@ function updateTreeView() {
     $('#treeView').jstree(true).refresh();
 }
 
-// Modify the showOrphanRecords function
 function showOrphanRecords() {
     if (!excelData || !columnMappings.parent || !columnMappings.child) {
         alert('Please load data and map the Parent and Child columns first');
@@ -635,26 +588,13 @@ function showOrphanRecords() {
         return;
     }
 
-    // Store orphans for searching
+    // Store the orphans data globally for searching
     window.currentOrphans = orphans;
 
-    // Display orphans in modal
-    const treeData = orphans.map((row, index) => ({
-        text: row[columnMappings.child] + 
-              (columnMappings.description && row[columnMappings.description] ? 
-               ` - ${row[columnMappings.description]}` : ''),
-        id: row[columnMappings.child],
-        data: { rowIndex: index },
-        icon: 'fas fa-exclamation-circle'
-    }));
+    // Display all orphans initially
+    searchOrphanRecords('');
 
-    $('#orphanRecordsTree').jstree(true).settings.core.data = treeData;
-    $('#orphanRecordsTree').jstree(true).refresh();
-    const modal = document.getElementById('orphanRecordsModal');
-    const modalContent = modal.querySelector('.modal-content');
-    resetModalPosition(modalContent);
-    modal.classList.add('show');
-    document.getElementById('orphanSearchContainer').style.display = 'block';
+    $('#orphanRecordsModal').addClass('show');
 }
 
 function displayOrphanRecords(orphans) {
@@ -683,17 +623,7 @@ function searchOrphans() {
         return childMatch || descMatch;
     });
 
-    const treeData = filteredOrphans.map((row, index) => ({
-        text: row[columnMappings.child] + 
-              (columnMappings.description && row[columnMappings.description] ? 
-               ` - ${row[columnMappings.description]}` : ''),
-        id: row[columnMappings.child],
-        data: { rowIndex: window.currentOrphans.indexOf(row) },
-        icon: 'fas fa-exclamation-circle'
-    }));
-
-    $('#orphanRecordsTree').jstree(true).settings.core.data = treeData;
-    $('#orphanRecordsTree').jstree(true).refresh();
+    displayOrphanRecords(filteredOrphans);
 }
 
 function clearOrphanSearch() {
@@ -727,136 +657,130 @@ function saveChanges() {
     XLSX.writeFile(wb, 'updated_hierarchy.xlsx');
 }
 
-// Add these functions near the top with other initializations
-// Modify the initializeModals function to setup tree node selection
 function initializeModals() {
-    document.getElementById('closeSearchResults').addEventListener('click', () => {
-        document.getElementById('searchResultsModal').classList.remove('show');
-    });
-    
-    document.getElementById('closeOrphanRecords').addEventListener('click', () => {
-        document.getElementById('orphanRecordsModal').classList.remove('show');
-        document.getElementById('orphanSearchContainer').style.display = 'none';
-    });
-
-    // Initialize the trees inside modals with node selection handling
-    $('#searchResultsTree, #orphanRecordsTree').jstree({
+    // Initialize jsTree for orphan records
+    $('#orphanRecordsTree').jstree({
         core: {
             themes: { name: 'default', dots: true, icons: true },
             data: []
         },
-        plugins: ['wholerow', 'search'],
-        search: {
-            show_only_matches: true,
-            show_only_matches_children: true,
-            close_opened_onclear: false
-        }
+        plugins: ['search', 'wholerow']
     }).on('select_node.jstree', function(e, data) {
-        const rowIndex = findDataRowIndex(data.node);
-        if (rowIndex !== -1) {
-            selectedNode = data.node;
-            const rightPanel = document.getElementById('rightPanel');
-            rightPanel.style.display = 'flex';
-            rightPanel.style.zIndex = '1001'; // Ensure it's above the modal overlay
-            updateEditForm({ data: { rowIndex: rowIndex } });
+        // When an orphan record is selected, populate the Edit Records panel
+        const nodeId = data.node.id;
+        const orphanData = findOrphanData(nodeId);
+        if (orphanData) {
+            // Set the selectedNode to null to avoid conflicts with the main tree
+            selectedNode = null;
+            updateEditFormWithOrphan(orphanData);
+            // Do not close the modal here
+            // Scroll to the Edit Records panel if needed
+            document.getElementById('rightPanel').scrollIntoView({ behavior: 'smooth' });
         }
     });
 
-    // Add modal search functionality
-    const modalSearchInput = document.getElementById('modalSearchInput');
-    const modalSearchClear = document.getElementById('modalSearchClear');
-    const modalOrphanSearchInput = document.getElementById('modalOrphanSearchInput');
-    const modalOrphanSearchClear = document.getElementById('modalOrphanSearchClear');
-
-    modalSearchInput.addEventListener('input', function() {
-        $('#searchResultsTree').jstree(true).search(this.value);
+    // Initialize jsTree for search results
+    $('#searchResultsTree').jstree({
+        core: {
+            themes: { name: 'default', dots: true, icons: true },
+            data: []
+        },
+        plugins: ['search', 'wholerow']
     });
 
-    modalSearchClear.addEventListener('click', function() {
-        modalSearchInput.value = '';
-        $('#searchResultsTree').jstree(true).clear_search();
+    // Orphan Records Modal events
+    document.getElementById('closeOrphanModal').addEventListener('click', function() {
+        $('#orphanRecordsModal').removeClass('show');
     });
 
-    modalOrphanSearchInput.addEventListener('input', function() {
-        $('#orphanRecordsTree').jstree(true).search(this.value);
+    // Remove the search button event listener since we'll search on input
+    // document.getElementById('orphanModalSearchButton').addEventListener('click', function() {
+    //     const searchTerm = $('#orphanModalSearchInput').val();
+    //     $('#orphanRecordsTree').jstree('search', searchTerm);
+    // });
+
+    // Add input event listener to search as user types
+    document.getElementById('orphanModalSearchInput').addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        searchOrphanRecords(searchTerm);
     });
 
-    modalOrphanSearchClear.addEventListener('click', function() {
-        modalOrphanSearchInput.value = '';
-        $('#orphanRecordsTree').jstree(true).clear_search();
+    // Optionally, remove the clear button if it's no longer needed
+    // document.getElementById('orphanModalClearButton').addEventListener('click', function() {
+    //     $('#orphanModalSearchInput').val('');
+    //     $('#orphanRecordsTree').jstree('clear_search');
+    // });
+
+    // Search Results Modal events
+    document.getElementById('closeSearchModal').addEventListener('click', function() {
+        $('#searchResultsModal').removeClass('show');
     });
 
-    initializeDraggableModals();
+    document.getElementById('searchModalButton').addEventListener('click', function() {
+        const searchTerm = $('#searchModalInput').val();
+        $('#searchResultsTree').jstree('search', searchTerm);
+    });
+
+    document.getElementById('searchModalClear').addEventListener('click', function() {
+        $('#searchModalInput').val('');
+        $('#searchResultsTree').jstree('clear_search');
+    });
 }
 
-// Add helper function to find data row index
-function findDataRowIndex(node) {
-    const nodeText = node.text.split(' - ')[0]; // Get the text before any description
-    return excelData.findIndex(row => 
-        row[columnMappings.parent] === nodeText || 
-        row[columnMappings.child] === nodeText
-    );
+function searchOrphanRecords(searchTerm) {
+    if (!window.currentOrphans) return;
+
+    const filteredOrphans = window.currentOrphans.filter(row => {
+        const childValue = row[columnMappings.child]?.toString().toLowerCase() || '';
+        const descriptionValue = columnMappings.description && row[columnMappings.description]
+            ? row[columnMappings.description].toString().toLowerCase()
+            : '';
+        return childValue.includes(searchTerm) || descriptionValue.includes(searchTerm);
+    });
+
+    const treeData = filteredOrphans.map(row => ({
+        text: row[columnMappings.child] +
+            (columnMappings.description && row[columnMappings.description]
+                ? ` - ${row[columnMappings.description]}`
+                : ''),
+        id: row[columnMappings.child],
+        icon: 'fas fa-exclamation-circle'
+    }));
+
+    $('#orphanRecordsTree').jstree(true).settings.core.data = treeData;
+    $('#orphanRecordsTree').jstree(true).refresh();
 }
 
-// Replace the initializeDraggableModals function
-function initializeDraggableModals() {
-    const modals = document.querySelectorAll('.modal-content');
+function findOrphanData(childId) {
+    if (!window.currentOrphans) return null;
+    return window.currentOrphans.find(row => row[columnMappings.child] === childId);
+}
+
+// Function to update the Edit Records panel with orphan data
+function updateEditFormWithOrphan(orphanData) {
+    const editForm = document.getElementById('editForm');
+    const editActions = document.querySelector('.edit-actions');
+
+    editForm.innerHTML = '';
+    editHistory = [{ ...orphanData }]; // Save initial state
+
+    const allColumns = Object.keys(excelData[0]);
+    allColumns.forEach(field => {
+        const formGroup = document.createElement('div');
+        formGroup.className = 'form-group';
+        
+        const label = document.createElement('label');
+        label.textContent = field;
+        
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = orphanData[field] || '';
+        input.dataset.field = field;
+        
+        formGroup.appendChild(label);
+        formGroup.appendChild(input);
+        editForm.appendChild(formGroup);
+    });
     
-    modals.forEach(modal => {
-        const header = modal.querySelector('.modal-header');
-        let isDragging = false;
-        let currentX = 0;
-        let currentY = 0;
-        let initialX = 0;
-        let initialY = 0;
-
-        header.addEventListener('mousedown', dragStart);
-        document.addEventListener('mousemove', drag);
-        document.addEventListener('mouseup', dragEnd);
-
-        function dragStart(e) {
-            if (e.target === header) {
-                const rect = modal.getBoundingClientRect();
-                initialX = e.clientX - rect.left;
-                initialY = e.clientY - rect.top;
-                
-                isDragging = true;
-                modal.classList.add('dragging');
-            }
-        }
-
-        function drag(e) {
-            if (!isDragging) return;
-
-            e.preventDefault();
-            currentX = e.clientX - initialX;
-            currentY = e.clientY - initialY;
-
-            // Keep modal within viewport bounds
-            const rect = modal.getBoundingClientRect();
-            const viewportWidth = window.innerWidth;
-            const viewportHeight = window.innerHeight;
-
-            if (currentX < 0) currentX = 0;
-            if (currentY < 0) currentY = 0;
-            if (currentX + rect.width > viewportWidth) currentX = viewportWidth - rect.width;
-            if (currentY + rect.height > viewportHeight) currentY = viewportHeight - rect.height;
-
-            modal.style.left = `${currentX}px`;
-            modal.style.top = `${currentY}px`;
-            modal.style.transform = 'none';
-        }
-
-        function dragEnd() {
-            isDragging = false;
-            modal.classList.remove('dragging');
-        }
-    });
-}
-
-// Update the resetModalPosition function
-function resetModalPosition(modalContent) {
-    modalContent.style.left = '50%';
-    modalContent.style.top = '50%';
-    modalContent.style.transform = 'translate(-50%, -50%)';
+    editActions.style.display = 'flex';
 }

@@ -54,7 +54,7 @@
                     <div class="search-box">
                         <input type="text" id="searchInput" placeholder="Search in hierarchy...">
                         <button id="searchButton" class="primary-button">Search</button>
-                        <button id="clearSearch" class="secondary-button">Back</button>
+                        <button id="clearSearch" class="secondary-button">Reset View</button>
                     </div>
                     <div class="search-options">
                         <label>
@@ -179,40 +179,32 @@
         </div>
     </div>
 
-    <!-- Search Results Modal -->
-    <div id="searchResultsModal" class="modal">
+    <!-- Orphan Records Modal -->
+    <div id="orphanRecordsModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <h3>Search Results</h3>
+            <h3>Orphan Records</h3>
+            <div class="search-box">
+                <input type="text" id="orphanModalSearchInput" placeholder="Search orphan records...">
             </div>
-            <div class="modal-body">
-                <div class="modal-search-box">
-                    <input type="text" id="modalSearchInput" placeholder="Filter results...">
-                    <button id="modalSearchClear" class="secondary-button">Clear</button>
-                </div>
-                <div id="searchResultsTree"></div>
-                <div class="modal-actions">
-                    <button id="closeSearchResults" class="secondary-button">Close</button>
-                </div>
+            <div id="orphanRecordsTree"></div>
+            <div class="modal-actions">
+                <button id="closeOrphanModal" class="secondary-button">Close</button>
             </div>
         </div>
     </div>
 
-    <!-- Orphan Records Modal -->
-    <div id="orphanRecordsModal" class="modal">
+    <!-- Search Results Modal -->
+    <div id="searchResultsModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <h3>Orphan Records</h3>
+            <h3>Search Results</h3>
+            <div class="search-box">
+                <input type="text" id="searchModalInput" placeholder="Search...">
+                <button id="searchModalButton" class="primary-button">Search</button>
+                <button id="searchModalClear" class="secondary-button">Clear</button>
             </div>
-            <div class="modal-body">
-                <div class="modal-search-box">
-                    <input type="text" id="modalOrphanSearchInput" placeholder="Filter orphans...">
-                    <button id="modalOrphanSearchClear" class="secondary-button">Clear</button>
-                </div>
-                <div id="orphanRecordsTree"></div>
-                <div class="modal-actions">
-                    <button id="closeOrphanRecords" class="secondary-button">Close</button>
-                </div>
+            <div id="searchResultsTree"></div>
+            <div class="modal-actions">
+                <button id="closeSearchModal" class="secondary-button">Close</button>
             </div>
         </div>
     </div>
