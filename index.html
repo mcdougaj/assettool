@@ -122,6 +122,7 @@
             <div class="actions">
                 <button id="addNewRecord" class="primary-button">Add New Record</button>
                 <button id="showOrphans" class="secondary-button">Show Orphan Records</button>
+                <button id="undoHierarchy" class="undo-button">Undo</button>
                 <button id="saveChanges" class="primary-button">Save Changes</button>
             </div>
         </div>
@@ -175,36 +176,6 @@
                     <button id="saveNewRecord" class="primary-button">Save Record</button>
                     <button id="cancelNewRecord" class="secondary-button">Cancel</button>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Orphan Records Modal -->
-    <div id="orphanRecordsModal" class="modal">
-        <div class="modal-content">
-            <h3>Orphan Records</h3>
-            <div class="search-box">
-                <input type="text" id="orphanModalSearchInput" placeholder="Search orphan records...">
-            </div>
-            <div id="orphanRecordsTree"></div>
-            <div class="modal-actions">
-                <button id="closeOrphanModal" class="secondary-button">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Search Results Modal -->
-    <div id="searchResultsModal" class="modal">
-        <div class="modal-content">
-            <h3>Search Results</h3>
-            <div class="search-box">
-                <input type="text" id="searchModalInput" placeholder="Search...">
-                <button id="searchModalButton" class="primary-button">Search</button>
-                <button id="searchModalClear" class="secondary-button">Clear</button>
-            </div>
-            <div id="searchResultsTree"></div>
-            <div class="modal-actions">
-                <button id="closeSearchModal" class="secondary-button">Close</button>
             </div>
         </div>
     </div>
