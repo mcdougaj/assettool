@@ -153,6 +153,7 @@ function initializeNewRecordModal() {
         }
 
         excelData.push(newRecord);
+        updateSummaries(); // Update summaries after adding
         updateTreeView();
         closeNewRecordModal();
         clearNewRecordForm();
@@ -335,6 +336,7 @@ function handleDrop(e) {
     const mappingType = e.currentTarget.dataset.type;
     columnMappings[mappingType] = column;
     
+    updateSummaries(); // Update summaries after mapping
     updateTreeView();
 }
 
@@ -378,6 +380,9 @@ function initializeTreeView() {
                 updateEditForm(data.node);
             }
         }
+
+        updateSummaries(); // Update summaries after moving
+        updateTreeView(); // Refresh tree view
     });
 
     // Add expand/collapse handlers
@@ -437,8 +442,8 @@ function updateEditForm(node) {
     editActions.style.display = 'flex';
     editForm.innerHTML = '';
 
-    // Use node.data for orphan records, otherwise find the data
-    const nodeData = node.data || findNodeData(node.text.split(' - ')[0]);
+    // Use node.original for non-orphan records to access all row data
+    const nodeData = node.isOrphan ? node.data : findNodeData(node.text.split(' - ')[0]);
     
     editPanelTitle.textContent = node.isOrphan ? 
         `Edit Orphan Record: ${node.text}` : 
@@ -447,7 +452,10 @@ function updateEditForm(node) {
     if (nodeData) {
         editHistory = [{ ...nodeData }];
         
-        const allColumns = Object.keys(excelData[0]);
+        const allColumns = Object.keys(excelData[0]).filter(field => 
+            field !== 'Family Path' && field !== 'Parent-Child(s)'
+        ); // Exclude summary columns
+
         allColumns.forEach(field => {
             const formGroup = document.createElement('div');
             formGroup.className = 'form-group';
@@ -473,10 +481,11 @@ function updateEditForm(node) {
 }
 
 function findNodeData(nodeText) {
-    return excelData.find(row => {
-        return row[columnMappings.parent] === nodeText || 
-               row[columnMappings.child] === nodeText;
-    });
+    // Ensure that the correct row is fetched based on child or parent mapping
+    return excelData.find(row => 
+        row[columnMappings.child] === nodeText || 
+        row[columnMappings.parent] === nodeText
+    );
 }
 
 function applyChanges() {
@@ -509,6 +518,9 @@ function cancelChanges() {
 function updateTreeView() {
     if (!excelData || !columnMappings.parent || !columnMappings.child) return;
 
+    // Update summaries before building tree
+    updateSummaries();
+
     const treeData = [];
     const processedNodes = new Set();
     const parentChildMap = new Map();
@@ -529,15 +541,20 @@ function updateTreeView() {
     function addNode(value, isParent = true, level = 0) {
         if (processedNodes.has(value)) return null;
         if (!value) return null;
-        
+
         processedNodes.add(value);
 
         const icons = ['fas fa-folder', 'fas fa-folder-open', 'fas fa-toolbox'];
+        const rowData = excelData.find(row => row[columnMappings.child] === value);
+        const familyPath = rowData ? rowData['Family Path'] : 'N/A';
+        const parentChild = rowData ? rowData['Parent-Child(s)'] : 'N/A';
+
         const node = {
             text: value,
             id: value,
             children: [],
-            icon: isParent ? icons[0] : icons[2]
+            icon: isParent ? icons[0] : icons[2],
+            data: rowData ? { ...rowData } : {} // Include all row data
         };
 
         if (parentChildMap.has(value)) {
@@ -656,9 +673,59 @@ function saveChanges() {
         return;
     }
 
+    updateSummaries(); // Ensure summaries are up to date
+
     const ws = XLSX.utils.json_to_sheet(excelData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Updated Data");
     
     XLSX.writeFile(wb, 'updated_hierarchy.xlsx');
+}
+
+// Function to build Family Path for each row
+function buildFamilyPaths() {
+    const parentMap = new Map();
+    excelData.forEach(row => {
+        parentMap.set(row[columnMappings.child], row[columnMappings.parent]);
+    });
+
+    excelData.forEach(row => {
+        let path = row[columnMappings.parent] ? row[columnMappings.parent] : row[columnMappings.child];
+        let currentParent = parentMap.get(row[columnMappings.parent]);
+        while (currentParent) {
+            path = currentParent + ' > ' + path;
+            currentParent = parentMap.get(currentParent);
+        }
+        row['Family Path'] = path;
+    });
+}
+
+// Function to build Parent-Child(s) summary for each row
+function buildParentChildSummary() {
+    const childMap = new Map();
+    const parentMap = new Map();
+
+    excelData.forEach(row => {
+        const parent = row[columnMappings.parent];
+        const child = row[columnMappings.child];
+        parentMap.set(child, parent);
+        if (parent) {
+            if (!childMap.has(parent)) {
+                childMap.set(parent, []);
+            }
+            childMap.get(parent).push(child);
+        }
+    });
+
+    excelData.forEach(row => {
+        const parent = row[columnMappings.parent] || 'None';
+        const children = childMap.get(row[columnMappings.child]) || [];
+        row['Parent-Child(s)'] = `Parent: ${parent}; Children: ${children.join(', ')}`;
+    });
+}
+
+// Function to update Family Path and Parent-Child(s) summaries
+function updateSummaries() {
+    buildFamilyPaths();
+    buildParentChildSummary();
 }
