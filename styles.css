@@ -70,7 +70,7 @@
 }
 
 .logo {
-    height: 60px;  /* Increased from 40px to 60px */
+    height: 60px;  /* Adjust size as needed */
     width: auto;
     object-fit: contain;
 }
@@ -161,6 +161,9 @@ body {
     height: 80px;  /* Increased from 60px to 80px to accommodate larger logo */
     min-height: 80px;
     width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .edit-panel-content {
