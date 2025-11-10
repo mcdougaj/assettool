@@ -190,6 +190,77 @@ body {
     box-shadow: 0 2px 4px rgba(33, 150, 243, 0.1);
 }
 
+/* PM/BOM Details Section */
+.pm-bom-details-section {
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    margin-top: 15px;
+    border: 1px solid #dee2e6;
+}
+
+.pm-bom-details-section h3 {
+    margin: 0 0 20px 0;
+    color: #495057;
+    font-size: 18px;
+    border-bottom: 2px solid #dee2e6;
+    padding-bottom: 10px;
+}
+
+.details-group {
+    margin-bottom: 20px;
+    background-color: white;
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+}
+
+.details-group h4 {
+    margin: 0 0 12px 0;
+    color: #495057;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.details-group h4 i {
+    color: #2196f3;
+}
+
+.details-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.details-item {
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    border-left: 3px solid #2196f3;
+    font-size: 13px;
+}
+
+.details-item.pm-item {
+    border-left-color: #007bff;
+}
+
+.details-item.bom-item {
+    border-left-color: #28a745;
+}
+
+.details-item-code {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 2px;
+}
+
+.details-item-description {
+    color: #6c757d;
+    font-size: 12px;
+}
+
 .edit-input.active {
     border-color: #dee2e6;
     background-color: #ffffff !important;
@@ -911,6 +982,26 @@ input[type="file"] {
 
 .modal-close:hover {
     color: #dc3545;
+}
+
+/* Tree badges for PM/BOM counts */
+.tree-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    margin-left: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 10px;
+    color: white;
+    vertical-align: middle;
+}
+
+.pm-badge {
+    background-color: #007bff;
+}
+
+.bom-badge {
+    background-color: #28a745;
 }
 
 .pm-management-container,

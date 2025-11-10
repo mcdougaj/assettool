@@ -572,6 +572,7 @@ function initializeTreeView() {
     }).on('select_node.jstree', function(e, data) {
         selectedNode = data.node;
         updateEditForm(selectedNode);
+        updatePMBOMDetails(selectedNode);
     }).on('move_node.jstree', function(e, data) {
         // Save current state before updating
         historyStack.push(JSON.stringify(excelData));
@@ -766,8 +767,21 @@ function updateTreeView() {
         const familyPath = rowData ? rowData['Family Path'] : 'N/A';
         const parentChild = rowData ? rowData['Parent-Child(s)'] : 'N/A';
 
+        // Get PM and BOM counts for this node
+        const pmCount = assetPmAssignments[value] ? assetPmAssignments[value].length : 0;
+        const bomCount = assetBomAssignments[value] ? assetBomAssignments[value].length : 0;
+
+        // Build node text with badges
+        let nodeText = value;
+        if (pmCount > 0) {
+            nodeText += ` <span class="tree-badge pm-badge">PM: ${pmCount}</span>`;
+        }
+        if (bomCount > 0) {
+            nodeText += ` <span class="tree-badge bom-badge">BOM: ${bomCount}</span>`;
+        }
+
         const node = {
-            text: value,
+            text: nodeText,
             id: value,
             children: [],
             icon: isParent ? icons[0] : icons[2],
@@ -778,7 +792,18 @@ function updateTreeView() {
             parentChildMap.get(value).forEach(({ child, description }) => {
                 const childNode = addNode(child, false, level + 1);
                 if (childNode) {
-                    childNode.text = child + (description ? ` - ${description}` : '');
+                    const childPmCount = assetPmAssignments[child] ? assetPmAssignments[child].length : 0;
+                    const childBomCount = assetBomAssignments[child] ? assetBomAssignments[child].length : 0;
+
+                    let childText = child + (description ? ` - ${description}` : '');
+                    if (childPmCount > 0) {
+                        childText += ` <span class="tree-badge pm-badge">PM: ${childPmCount}</span>`;
+                    }
+                    if (childBomCount > 0) {
+                        childText += ` <span class="tree-badge bom-badge">BOM: ${childBomCount}</span>`;
+                    }
+
+                    childNode.text = childText;
                     node.children.push(childNode);
                     node.icon = icons[1]; // Change to open folder if it has children
                 }
@@ -1134,6 +1159,7 @@ function addPMToSelectedNodes(pmId) {
 
         renderAssignedPMs();
         renderPMList(document.getElementById('pmSearchInput').value); // Refresh the list to update button states
+        updateTreeView(); // Refresh tree to show updated badges
 
         const pm = pmRecords.find(p => p.id === pmId);
         if (pm) {
@@ -1150,6 +1176,7 @@ function removePMAssignment(nodeId, pmId) {
         assetPmAssignments[nodeId] = assetPmAssignments[nodeId].filter(id => id !== pmId);
         renderAssignedPMs();
         renderPMList(document.getElementById('pmSearchInput').value); // Refresh list to update button states
+        updateTreeView(); // Refresh tree to show updated badges
         showToast('PM assignment removed', 'success');
     }
 }
@@ -1319,6 +1346,7 @@ function copyPMFromAsset() {
 
         renderAssignedPMs();
         renderPMList(document.getElementById('pmSearchInput').value);
+        updateTreeView(); // Refresh tree to show updated badges
 
         const tree = $('#treeView').jstree(true);
         const sourceNode = tree.get_node(sourceNodeId);
@@ -1474,6 +1502,7 @@ function addBOMToSelectedNodes(bomId) {
 
         renderAssignedBOMs();
         renderBOMList(document.getElementById('bomSearchInput').value); // Refresh the list to update button states
+        updateTreeView(); // Refresh tree to show updated badges
 
         const bom = bomRecords.find(b => b.id === bomId);
         if (bom) {
@@ -1490,6 +1519,7 @@ function removeBOMAssignment(nodeId, bomId) {
         assetBomAssignments[nodeId] = assetBomAssignments[nodeId].filter(id => id !== bomId);
         renderAssignedBOMs();
         renderBOMList(document.getElementById('bomSearchInput').value); // Refresh list to update button states
+        updateTreeView(); // Refresh tree to show updated badges
         showToast('BOM assignment removed', 'success');
     }
 }
@@ -1626,6 +1656,7 @@ function copyBOMFromAsset() {
 
         renderAssignedBOMs();
         renderBOMList(document.getElementById('bomSearchInput').value);
+        updateTreeView(); // Refresh tree to show updated badges
 
         const tree = $('#treeView').jstree(true);
         const sourceNode = tree.get_node(sourceNodeId);
@@ -1678,3 +1709,73 @@ window.addEventListener('click', function(event) {
         closeBOMManagementModal();
     }
 });
+
+// Update PM/BOM details section in the edit panel
+function updatePMBOMDetails(node) {
+    const detailsSection = document.getElementById('pmBomDetailsSection');
+    const pmDetailsList = document.getElementById('pmDetailsList');
+    const bomDetailsList = document.getElementById('bomDetailsList');
+    const pmCountElement = document.getElementById('pmDetailsCount');
+    const bomCountElement = document.getElementById('bomDetailsCount');
+
+    if (!node) {
+        detailsSection.style.display = 'none';
+        return;
+    }
+
+    const nodeId = node.id;
+    const pmAssignments = assetPmAssignments[nodeId] || [];
+    const bomAssignments = assetBomAssignments[nodeId] || [];
+
+    // Show the section if there are assignments
+    if (pmAssignments.length > 0 || bomAssignments.length > 0) {
+        detailsSection.style.display = 'block';
+    } else {
+        detailsSection.style.display = 'none';
+        return;
+    }
+
+    // Update PM count
+    pmCountElement.textContent = pmAssignments.length;
+
+    // Populate PM list
+    if (pmAssignments.length > 0) {
+        pmDetailsList.innerHTML = '';
+        pmAssignments.forEach(pmId => {
+            const pm = pmRecords.find(p => p.id === pmId);
+            if (pm) {
+                const item = document.createElement('div');
+                item.className = 'details-item pm-item';
+                item.innerHTML = `
+                    <div class="details-item-code">${sanitizeInput(pm.code)}</div>
+                    <div class="details-item-description">${sanitizeInput(pm.description)} | ${sanitizeInput(pm.frequency)}</div>
+                `;
+                pmDetailsList.appendChild(item);
+            }
+        });
+    } else {
+        pmDetailsList.innerHTML = '<p class="placeholder-text">No PM tasks assigned</p>';
+    }
+
+    // Update BOM count
+    bomCountElement.textContent = bomAssignments.length;
+
+    // Populate BOM list
+    if (bomAssignments.length > 0) {
+        bomDetailsList.innerHTML = '';
+        bomAssignments.forEach(bomId => {
+            const bom = bomRecords.find(b => b.id === bomId);
+            if (bom) {
+                const item = document.createElement('div');
+                item.className = 'details-item bom-item';
+                item.innerHTML = `
+                    <div class="details-item-code">${sanitizeInput(bom.partNumber)}</div>
+                    <div class="details-item-description">${sanitizeInput(bom.description)} | Qty: ${bom.quantity} ${bom.unit}</div>
+                `;
+                bomDetailsList.appendChild(item);
+            }
+        });
+    } else {
+        bomDetailsList.innerHTML = '<p class="placeholder-text">No BOM items assigned</p>';
+    }
+}

@@ -148,6 +148,26 @@
                         <p class="placeholder-text">Select a node in the tree to edit its values</p>
                     </div>
                 </div>
+
+                <!-- PM/BOM Details Section -->
+                <div id="pmBomDetailsSection" class="pm-bom-details-section" style="display: none;">
+                    <h3>PM & BOM Assignments</h3>
+
+                    <div class="details-group">
+                        <h4><i class="fas fa-clipboard-check"></i> PM Tasks (<span id="pmDetailsCount">0</span>)</h4>
+                        <div id="pmDetailsList" class="details-list">
+                            <p class="placeholder-text">No PM tasks assigned</p>
+                        </div>
+                    </div>
+
+                    <div class="details-group">
+                        <h4><i class="fas fa-box"></i> BOM Items (<span id="bomDetailsCount">0</span>)</h4>
+                        <div id="bomDetailsList" class="details-list">
+                            <p class="placeholder-text">No BOM items assigned</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="edit-panel-footer">
                     <div class="edit-actions" style="display: none;">
                         <button id="undoEditChanges" class="undo-button">Undo Edit</button>
