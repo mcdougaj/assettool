@@ -9,8 +9,146 @@ let originalWorkbook = null;
 let lastTreeData = null;
 let historyStack = []; // Add history stack
 let editHistory = [];
+let selectedNodes = []; // For multi-select
+let pmRecords = []; // PM records storage
+let bomRecords = []; // BOM records storage
+let assetPmAssignments = {}; // Maps asset IDs to PM records
+let assetBomAssignments = {}; // Maps asset IDs to BOM records
+
+// Constants
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const TOAST_DURATION = 4000; // 4 seconds
+
+// Utility Functions
+function sanitizeInput(input) {
+    if (typeof input !== 'string') return input;
+    const div = document.createElement('div');
+    div.textContent = input;
+    return div.innerHTML;
+}
+
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+
+    const icons = {
+        success: '✓',
+        error: '✕',
+        warning: '⚠',
+        info: 'ℹ'
+    };
+
+    toast.innerHTML = `
+        <span class="toast-icon">${icons[type] || icons.info}</span>
+        <span class="toast-message">${sanitizeInput(message)}</span>
+        <button class="toast-close">×</button>
+    `;
+
+    container.appendChild(toast);
+
+    const closeBtn = toast.querySelector('.toast-close');
+    closeBtn.addEventListener('click', () => removeToast(toast));
+
+    setTimeout(() => removeToast(toast), TOAST_DURATION);
+}
+
+function removeToast(toast) {
+    toast.classList.add('hiding');
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+    }, 300);
+}
+
+function showConfirmDialog(title, message) {
+    return new Promise((resolve) => {
+        const dialog = document.getElementById('confirmDialog');
+        const titleEl = document.getElementById('confirmTitle');
+        const messageEl = document.getElementById('confirmMessage');
+        const yesBtn = document.getElementById('confirmYes');
+        const noBtn = document.getElementById('confirmNo');
+
+        titleEl.textContent = title;
+        messageEl.textContent = message;
+        dialog.classList.add('show');
+
+        function handleYes() {
+            dialog.classList.remove('show');
+            cleanup();
+            resolve(true);
+        }
+
+        function handleNo() {
+            dialog.classList.remove('show');
+            cleanup();
+            resolve(false);
+        }
+
+        function cleanup() {
+            yesBtn.removeEventListener('click', handleYes);
+            noBtn.removeEventListener('click', handleNo);
+        }
+
+        yesBtn.addEventListener('click', handleYes);
+        noBtn.addEventListener('click', handleNo);
+    });
+}
+
+function showLoading(message = 'Processing...') {
+    const overlay = document.createElement('div');
+    overlay.id = 'loadingOverlay';
+    overlay.className = 'loading-overlay';
+    overlay.innerHTML = `
+        <div class="loading-spinner"></div>
+        <div class="loading-text">${sanitizeInput(message)}</div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+function hideLoading() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        overlay.remove();
+    }
+}
+
+function validateFileSize(file) {
+    if (file.size > MAX_FILE_SIZE) {
+        showToast(`File size exceeds ${MAX_FILE_SIZE / (1024 * 1024)}MB limit`, 'error');
+        return false;
+    }
+    return true;
+}
+
+function getSelectedTreeNodes() {
+    const tree = $('#treeView').jstree(true);
+    const selected = tree.get_selected(true);
+    return selected;
+}
+
+// Initialize sample PM and BOM data
+function initializeSampleData() {
+    pmRecords = [
+        { id: 'PM001', code: 'PM-DAILY-001', description: 'Daily Visual Inspection', frequency: 'Daily', type: 'Inspection' },
+        { id: 'PM002', code: 'PM-WEEKLY-001', description: 'Weekly Lubrication Check', frequency: 'Weekly', type: 'Maintenance' },
+        { id: 'PM003', code: 'PM-MONTHLY-001', description: 'Monthly Calibration', frequency: 'Monthly', type: 'Calibration' },
+        { id: 'PM004', code: 'PM-QUARTERLY-001', description: 'Quarterly Safety Inspection', frequency: 'Quarterly', type: 'Safety' },
+        { id: 'PM005', code: 'PM-ANNUAL-001', description: 'Annual Equipment Overhaul', frequency: 'Annual', type: 'Overhaul' }
+    ];
+
+    bomRecords = [
+        { id: 'BOM001', partNumber: 'PART-001', description: 'Hydraulic Oil Filter', quantity: 2, unit: 'pcs' },
+        { id: 'BOM002', partNumber: 'PART-002', description: 'Air Filter Element', quantity: 1, unit: 'pcs' },
+        { id: 'BOM003', partNumber: 'PART-003', description: 'Bearing Assembly', quantity: 4, unit: 'pcs' },
+        { id: 'BOM004', partNumber: 'PART-004', description: 'Drive Belt', quantity: 2, unit: 'pcs' },
+        { id: 'BOM005', partNumber: 'PART-005', description: 'Lubrication Grease', quantity: 1, unit: 'kg' }
+    ];
+}
 
 document.addEventListener('DOMContentLoaded', function() {
+    initializeSampleData();
     initializeFileLoader();
     initializeDragAndDrop();
     initializeTreeView();
@@ -21,6 +159,8 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeCollapsibleSections();
     initializeUndoButton();
     initializeOrphanSearch();
+    initializePMManagement();
+    initializeBOMManagement();
 });
 
 function initializeUndoButton() {
@@ -31,8 +171,9 @@ function undoLastChange() {
     if (historyStack.length > 0) {
         excelData = JSON.parse(historyStack.pop()); // Restore previous state
         updateTreeView();
+        showToast('Changes undone successfully', 'success');
     } else {
-        alert('No more changes to undo');
+        showToast('No more changes to undo', 'info');
     }
 }
 
@@ -52,20 +193,47 @@ function initializeCollapsibleSections() {
 
 function initializeFileLoader() {
     document.getElementById('loadFile').addEventListener('click', function() {
-        const fileInput = document.getElementById('excelFile');
-        const file = fileInput.files[0];
-        if (file) {
+        try {
+            const fileInput = document.getElementById('excelFile');
+            const file = fileInput.files[0];
+            if (!file) {
+                showToast('Please select a file first', 'warning');
+                return;
+            }
+
+            if (!validateFileSize(file)) {
+                return;
+            }
+
+            showLoading('Loading file...');
             const reader = new FileReader();
+
             reader.onload = function(e) {
-                const data = new Uint8Array(e.target.result);
-                originalWorkbook = XLSX.read(data, { type: 'array' });
-                const firstSheet = originalWorkbook.Sheets[originalWorkbook.SheetNames[0]];
-                excelData = XLSX.utils.sheet_to_json(firstSheet);
-                populateColumnsList();
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    originalWorkbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = originalWorkbook.Sheets[originalWorkbook.SheetNames[0]];
+                    excelData = XLSX.utils.sheet_to_json(firstSheet);
+                    populateColumnsList();
+                    hideLoading();
+                    showToast('File loaded successfully', 'success');
+                } catch (error) {
+                    hideLoading();
+                    console.error('Error reading file:', error);
+                    showToast('Failed to read Excel file. Please check the file format', 'error');
+                }
             };
+
+            reader.onerror = function() {
+                hideLoading();
+                showToast('Failed to read file', 'error');
+            };
+
             reader.readAsArrayBuffer(file);
-        } else {
-            alert('Please select a file first');
+        } catch (error) {
+            hideLoading();
+            console.error('Error loading file:', error);
+            showToast('An error occurred while loading the file', 'error');
         }
     });
 }
@@ -128,35 +296,41 @@ function initializeNewRecordModal() {
 
     addButton.addEventListener('click', function() {
         if (!columnMappings.parent || !columnMappings.child) {
-            alert('Please map the Parent and Child columns first');
+            showToast('Please map the Parent and Child columns first', 'warning');
             return;
         }
         modal.classList.add('show');
     });
 
     saveButton.addEventListener('click', function() {
-        const parentValue = document.getElementById('newParentValue').value.trim();
-        const childValue = document.getElementById('newChildValue').value.trim();
-        const description = document.getElementById('newDescription').value.trim();
+        try {
+            const parentValue = sanitizeInput(document.getElementById('newParentValue').value.trim());
+            const childValue = sanitizeInput(document.getElementById('newChildValue').value.trim());
+            const description = sanitizeInput(document.getElementById('newDescription').value.trim());
 
-        if (!parentValue || !childValue) {
-            alert('Parent and Child values are required');
-            return;
+            if (!parentValue || !childValue) {
+                showToast('Parent and Child values are required', 'warning');
+                return;
+            }
+
+            historyStack.push(JSON.stringify(excelData)); // Save current state
+            const newRecord = {};
+            newRecord[columnMappings.parent] = parentValue;
+            newRecord[columnMappings.child] = childValue;
+            if (columnMappings.description) {
+                newRecord[columnMappings.description] = description;
+            }
+
+            excelData.push(newRecord);
+            updateSummaries(); // Update summaries after adding
+            updateTreeView();
+            closeNewRecordModal();
+            clearNewRecordForm();
+            showToast('New record added successfully', 'success');
+        } catch (error) {
+            console.error('Error adding new record:', error);
+            showToast('Failed to add new record', 'error');
         }
-
-        historyStack.push(JSON.stringify(excelData)); // Save current state
-        const newRecord = {};
-        newRecord[columnMappings.parent] = parentValue;
-        newRecord[columnMappings.child] = childValue;
-        if (columnMappings.description) {
-            newRecord[columnMappings.description] = description;
-        }
-
-        excelData.push(newRecord);
-        updateSummaries(); // Update summaries after adding
-        updateTreeView();
-        closeNewRecordModal();
-        clearNewRecordForm();
     });
 
     cancelButton.addEventListener('click', closeNewRecordModal);
@@ -210,7 +384,7 @@ function performSearch() {
     });
 
     if (searchResults.length === 0) {
-        alert('No matches found');
+        showToast('No matches found', 'info');
         return;
     }
 
@@ -407,8 +581,8 @@ function initializeEditPanel() {
 function undoEditChanges() {
     if (editHistory.length > 0) {
         const lastState = editHistory.pop();
-        const rowIndex = excelData.findIndex(row => 
-            row[columnMappings.parent] === lastState[columnMappings.parent] || 
+        const rowIndex = excelData.findIndex(row =>
+            row[columnMappings.parent] === lastState[columnMappings.parent] ||
             row[columnMappings.child] === lastState[columnMappings.child]
         );
 
@@ -416,9 +590,10 @@ function undoEditChanges() {
             excelData[rowIndex] = { ...lastState };
             updateTreeView();
             updateEditForm(selectedNode);
+            showToast('Edit changes undone', 'success');
         }
     } else {
-        alert('No more edit changes to undo');
+        showToast('No more edit changes to undo', 'info');
     }
 }
 
@@ -584,25 +759,30 @@ function updateTreeView() {
 }
 
 function showOrphanRecords() {
-    if (!excelData || !columnMappings.parent || !columnMappings.child) {
-        alert('Please load data and map the Parent and Child columns first');
-        return;
+    try {
+        if (!excelData || !columnMappings.parent || !columnMappings.child) {
+            showToast('Please load data and map the Parent and Child columns first', 'warning');
+            return;
+        }
+
+        const orphans = excelData.filter(row => {
+            return !row[columnMappings.parent] ||
+                   row[columnMappings.parent] === '' ||
+                   row[columnMappings.parent] === null;
+        });
+
+        if (orphans.length === 0) {
+            showToast('No orphan records found', 'info');
+            return;
+        }
+
+        // Store orphans for searching
+        window.currentOrphans = orphans;
+        displayOrphanRecordsInModal(orphans);
+    } catch (error) {
+        console.error('Error showing orphan records:', error);
+        showToast('Failed to load orphan records', 'error');
     }
-
-    const orphans = excelData.filter(row => {
-        return !row[columnMappings.parent] || 
-               row[columnMappings.parent] === '' || 
-               row[columnMappings.parent] === null;
-    });
-
-    if (orphans.length === 0) {
-        alert('No orphan records found');
-        return;
-    }
-
-    // Store orphans for searching
-    window.currentOrphans = orphans;
-    displayOrphanRecordsInModal(orphans);
 }
 
 function displayOrphanRecordsInModal(orphans) {
@@ -667,19 +847,56 @@ function initializeOrphanSearch() {
     });
 }
 
-function saveChanges() {
-    if (!excelData || !columnMappings.parent || !columnMappings.child) {
-        alert('Please load data and map the Parent and Child columns first');
-        return;
+async function saveChanges() {
+    try {
+        if (!excelData || !columnMappings.parent || !columnMappings.child) {
+            showToast('Please load data and map the Parent and Child columns first', 'warning');
+            return;
+        }
+
+        const confirmed = await showConfirmDialog(
+            'Export Changes',
+            'Are you sure you want to export the current hierarchy to Excel?'
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        showLoading('Exporting data...');
+        updateSummaries(); // Ensure summaries are up to date
+
+        // Add PM and BOM data to export
+        const exportData = excelData.map(row => {
+            const nodeId = row[columnMappings.child];
+            const pmList = assetPmAssignments[nodeId] || [];
+            const bomList = assetBomAssignments[nodeId] || [];
+
+            return {
+                ...row,
+                'PM Tasks': pmList.map(pmId => {
+                    const pm = pmRecords.find(p => p.id === pmId);
+                    return pm ? pm.code : '';
+                }).join(', '),
+                'BOM Items': bomList.map(bomId => {
+                    const bom = bomRecords.find(b => b.id === bomId);
+                    return bom ? bom.partNumber : '';
+                }).join(', ')
+            };
+        });
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Updated Data");
+
+        XLSX.writeFile(wb, 'updated_hierarchy.xlsx');
+        hideLoading();
+        showToast('Data exported successfully', 'success');
+    } catch (error) {
+        hideLoading();
+        console.error('Error saving changes:', error);
+        showToast('Failed to export data', 'error');
     }
-
-    updateSummaries(); // Ensure summaries are up to date
-
-    const ws = XLSX.utils.json_to_sheet(excelData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Updated Data");
-    
-    XLSX.writeFile(wb, 'updated_hierarchy.xlsx');
 }
 
 // Function to build Family Path for each row
@@ -728,4 +945,421 @@ function buildParentChildSummary() {
 function updateSummaries() {
     buildFamilyPaths();
     buildParentChildSummary();
+}
+
+// PM Management Functions
+function initializePMManagement() {
+    const managePmBtn = document.getElementById('managePM');
+    const closePmBtn = document.getElementById('closePmModal');
+    const savePmBtn = document.getElementById('savePmAssignments');
+    const addPmBtn = document.getElementById('addNewPm');
+    const pmSearchInput = document.getElementById('pmSearchInput');
+
+    managePmBtn.addEventListener('click', openPMManagementModal);
+    closePmBtn.addEventListener('click', closePMManagementModal);
+    savePmBtn.addEventListener('click', savePMAssignments);
+    addPmBtn.addEventListener('click', addNewPMRecord);
+    pmSearchInput.addEventListener('input', filterPMList);
+}
+
+function openPMManagementModal() {
+    try {
+        selectedNodes = getSelectedTreeNodes();
+        if (selectedNodes.length === 0) {
+            showToast('Please select at least one node in the tree', 'warning');
+            return;
+        }
+
+        const modal = document.getElementById('pmManagementModal');
+        modal.classList.add('show');
+
+        displaySelectedNodes('selectedNodesDisplay');
+        renderPMList();
+        renderAssignedPMs();
+    } catch (error) {
+        console.error('Error opening PM management:', error);
+        showToast('Failed to open PM management', 'error');
+    }
+}
+
+function closePMManagementModal() {
+    const modal = document.getElementById('pmManagementModal');
+    modal.classList.remove('show');
+    selectedNodes = [];
+}
+
+function renderPMList(filter = '') {
+    const pmList = document.getElementById('pmList');
+    pmList.innerHTML = '';
+
+    const filteredPMs = pmRecords.filter(pm =>
+        pm.code.toLowerCase().includes(filter.toLowerCase()) ||
+        pm.description.toLowerCase().includes(filter.toLowerCase())
+    );
+
+    if (filteredPMs.length === 0) {
+        pmList.innerHTML = '<p class="placeholder-text">No PM records found</p>';
+        return;
+    }
+
+    filteredPMs.forEach(pm => {
+        const card = document.createElement('div');
+        card.className = 'item-card';
+        card.innerHTML = `
+            <input type="checkbox" data-pm-id="${pm.id}">
+            <div class="item-info">
+                <div class="item-code">${sanitizeInput(pm.code)}</div>
+                <div class="item-description">${sanitizeInput(pm.description)}</div>
+                <div class="item-meta">Frequency: ${sanitizeInput(pm.frequency)} | Type: ${sanitizeInput(pm.type)}</div>
+            </div>
+        `;
+
+        const checkbox = card.querySelector('input[type="checkbox"]');
+        checkbox.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                card.classList.add('selected');
+            } else {
+                card.classList.remove('selected');
+            }
+        });
+
+        pmList.appendChild(card);
+    });
+}
+
+function renderAssignedPMs() {
+    const assignedList = document.getElementById('assignedPmList');
+    assignedList.innerHTML = '';
+
+    if (selectedNodes.length === 0) return;
+
+    const nodeId = selectedNodes[0].id;
+    const assigned = assetPmAssignments[nodeId] || [];
+
+    if (assigned.length === 0) {
+        assignedList.innerHTML = '<p class="placeholder-text">No PM tasks assigned</p>';
+        return;
+    }
+
+    assigned.forEach(pmId => {
+        const pm = pmRecords.find(p => p.id === pmId);
+        if (!pm) return;
+
+        const card = document.createElement('div');
+        card.className = 'item-card';
+        card.innerHTML = `
+            <div class="item-info">
+                <div class="item-code">${sanitizeInput(pm.code)}</div>
+                <div class="item-description">${sanitizeInput(pm.description)}</div>
+                <div class="item-meta">Frequency: ${sanitizeInput(pm.frequency)}</div>
+            </div>
+            <button class="item-remove" data-pm-id="${pm.id}">Remove</button>
+        `;
+
+        const removeBtn = card.querySelector('.item-remove');
+        removeBtn.addEventListener('click', () => removePMAssignment(nodeId, pmId));
+
+        assignedList.appendChild(card);
+    });
+}
+
+function savePMAssignments() {
+    try {
+        const checkedBoxes = document.querySelectorAll('#pmList input[type="checkbox"]:checked');
+        const pmIds = Array.from(checkedBoxes).map(cb => cb.dataset.pmId);
+
+        selectedNodes.forEach(node => {
+            if (!assetPmAssignments[node.id]) {
+                assetPmAssignments[node.id] = [];
+            }
+
+            pmIds.forEach(pmId => {
+                if (!assetPmAssignments[node.id].includes(pmId)) {
+                    assetPmAssignments[node.id].push(pmId);
+                }
+            });
+        });
+
+        renderAssignedPMs();
+
+        checkedBoxes.forEach(cb => {
+            cb.checked = false;
+            cb.closest('.item-card').classList.remove('selected');
+        });
+
+        showToast('PM assignments saved successfully', 'success');
+    } catch (error) {
+        console.error('Error saving PM assignments:', error);
+        showToast('Failed to save PM assignments', 'error');
+    }
+}
+
+function removePMAssignment(nodeId, pmId) {
+    if (assetPmAssignments[nodeId]) {
+        assetPmAssignments[nodeId] = assetPmAssignments[nodeId].filter(id => id !== pmId);
+        renderAssignedPMs();
+        showToast('PM assignment removed', 'success');
+    }
+}
+
+function addNewPMRecord() {
+    try {
+        const code = document.getElementById('newPmCode').value.trim();
+        const description = document.getElementById('newPmDescription').value.trim();
+        const frequency = document.getElementById('newPmFrequency').value.trim();
+
+        if (!code || !description || !frequency) {
+            showToast('Please fill in all PM fields', 'warning');
+            return;
+        }
+
+        const newPM = {
+            id: 'PM' + (Date.now()),
+            code: sanitizeInput(code),
+            description: sanitizeInput(description),
+            frequency: sanitizeInput(frequency),
+            type: 'Custom'
+        };
+
+        pmRecords.push(newPM);
+        renderPMList();
+
+        document.getElementById('newPmCode').value = '';
+        document.getElementById('newPmDescription').value = '';
+        document.getElementById('newPmFrequency').value = '';
+
+        showToast('New PM record added', 'success');
+    } catch (error) {
+        console.error('Error adding PM record:', error);
+        showToast('Failed to add PM record', 'error');
+    }
+}
+
+function filterPMList() {
+    const filter = document.getElementById('pmSearchInput').value;
+    renderPMList(filter);
+}
+
+// BOM Management Functions
+function initializeBOMManagement() {
+    const manageBomBtn = document.getElementById('manageBOM');
+    const closeBomBtn = document.getElementById('closeBomModal');
+    const saveBomBtn = document.getElementById('saveBomAssignments');
+    const addBomBtn = document.getElementById('addNewBom');
+    const bomSearchInput = document.getElementById('bomSearchInput');
+
+    manageBomBtn.addEventListener('click', openBOMManagementModal);
+    closeBomBtn.addEventListener('click', closeBOMManagementModal);
+    saveBomBtn.addEventListener('click', saveBOMAssignments);
+    addBomBtn.addEventListener('click', addNewBOMRecord);
+    bomSearchInput.addEventListener('input', filterBOMList);
+}
+
+function openBOMManagementModal() {
+    try {
+        selectedNodes = getSelectedTreeNodes();
+        if (selectedNodes.length === 0) {
+            showToast('Please select at least one node in the tree', 'warning');
+            return;
+        }
+
+        const modal = document.getElementById('bomManagementModal');
+        modal.classList.add('show');
+
+        displaySelectedNodes('selectedNodesBomDisplay');
+        renderBOMList();
+        renderAssignedBOMs();
+    } catch (error) {
+        console.error('Error opening BOM management:', error);
+        showToast('Failed to open BOM management', 'error');
+    }
+}
+
+function closeBOMManagementModal() {
+    const modal = document.getElementById('bomManagementModal');
+    modal.classList.remove('show');
+    selectedNodes = [];
+}
+
+function renderBOMList(filter = '') {
+    const bomList = document.getElementById('bomList');
+    bomList.innerHTML = '';
+
+    const filteredBOMs = bomRecords.filter(bom =>
+        bom.partNumber.toLowerCase().includes(filter.toLowerCase()) ||
+        bom.description.toLowerCase().includes(filter.toLowerCase())
+    );
+
+    if (filteredBOMs.length === 0) {
+        bomList.innerHTML = '<p class="placeholder-text">No inventory items found</p>';
+        return;
+    }
+
+    filteredBOMs.forEach(bom => {
+        const card = document.createElement('div');
+        card.className = 'item-card';
+        card.innerHTML = `
+            <input type="checkbox" data-bom-id="${bom.id}">
+            <div class="item-info">
+                <div class="item-code">${sanitizeInput(bom.partNumber)}</div>
+                <div class="item-description">${sanitizeInput(bom.description)}</div>
+                <div class="item-meta">Quantity: ${bom.quantity} ${sanitizeInput(bom.unit)}</div>
+            </div>
+        `;
+
+        const checkbox = card.querySelector('input[type="checkbox"]');
+        checkbox.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                card.classList.add('selected');
+            } else {
+                card.classList.remove('selected');
+            }
+        });
+
+        bomList.appendChild(card);
+    });
+}
+
+function renderAssignedBOMs() {
+    const assignedList = document.getElementById('assignedBomList');
+    assignedList.innerHTML = '';
+
+    if (selectedNodes.length === 0) return;
+
+    const nodeId = selectedNodes[0].id;
+    const assigned = assetBomAssignments[nodeId] || [];
+
+    if (assigned.length === 0) {
+        assignedList.innerHTML = '<p class="placeholder-text">No BOM items assigned</p>';
+        return;
+    }
+
+    assigned.forEach(bomId => {
+        const bom = bomRecords.find(b => b.id === bomId);
+        if (!bom) return;
+
+        const card = document.createElement('div');
+        card.className = 'item-card';
+        card.innerHTML = `
+            <div class="item-info">
+                <div class="item-code">${sanitizeInput(bom.partNumber)}</div>
+                <div class="item-description">${sanitizeInput(bom.description)}</div>
+                <div class="item-meta">Quantity: ${bom.quantity} ${sanitizeInput(bom.unit)}</div>
+            </div>
+            <button class="item-remove" data-bom-id="${bom.id}">Remove</button>
+        `;
+
+        const removeBtn = card.querySelector('.item-remove');
+        removeBtn.addEventListener('click', () => removeBOMAssignment(nodeId, bomId));
+
+        assignedList.appendChild(card);
+    });
+}
+
+function saveBOMAssignments() {
+    try {
+        const checkedBoxes = document.querySelectorAll('#bomList input[type="checkbox"]:checked');
+        const bomIds = Array.from(checkedBoxes).map(cb => cb.dataset.bomId);
+
+        selectedNodes.forEach(node => {
+            if (!assetBomAssignments[node.id]) {
+                assetBomAssignments[node.id] = [];
+            }
+
+            bomIds.forEach(bomId => {
+                if (!assetBomAssignments[node.id].includes(bomId)) {
+                    assetBomAssignments[node.id].push(bomId);
+                }
+            });
+        });
+
+        renderAssignedBOMs();
+
+        checkedBoxes.forEach(cb => {
+            cb.checked = false;
+            cb.closest('.item-card').classList.remove('selected');
+        });
+
+        showToast('BOM assignments saved successfully', 'success');
+    } catch (error) {
+        console.error('Error saving BOM assignments:', error);
+        showToast('Failed to save BOM assignments', 'error');
+    }
+}
+
+function removeBOMAssignment(nodeId, bomId) {
+    if (assetBomAssignments[nodeId]) {
+        assetBomAssignments[nodeId] = assetBomAssignments[nodeId].filter(id => id !== bomId);
+        renderAssignedBOMs();
+        showToast('BOM assignment removed', 'success');
+    }
+}
+
+function addNewBOMRecord() {
+    try {
+        const partNumber = document.getElementById('newBomPartNumber').value.trim();
+        const description = document.getElementById('newBomDescription').value.trim();
+        const quantity = document.getElementById('newBomQuantity').value;
+
+        if (!partNumber || !description || !quantity) {
+            showToast('Please fill in all BOM fields', 'warning');
+            return;
+        }
+
+        const newBOM = {
+            id: 'BOM' + (Date.now()),
+            partNumber: sanitizeInput(partNumber),
+            description: sanitizeInput(description),
+            quantity: parseInt(quantity),
+            unit: 'pcs'
+        };
+
+        bomRecords.push(newBOM);
+        renderBOMList();
+
+        document.getElementById('newBomPartNumber').value = '';
+        document.getElementById('newBomDescription').value = '';
+        document.getElementById('newBomQuantity').value = '1';
+
+        showToast('New BOM item added', 'success');
+    } catch (error) {
+        console.error('Error adding BOM item:', error);
+        showToast('Failed to add BOM item', 'error');
+    }
+}
+
+function filterBOMList() {
+    const filter = document.getElementById('bomSearchInput').value;
+    renderBOMList(filter);
+}
+
+function displaySelectedNodes(containerId) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+
+    if (selectedNodes.length === 0) {
+        container.innerHTML = '<p class="placeholder-text">No nodes selected</p>';
+        return;
+    }
+
+    selectedNodes.forEach(node => {
+        const tag = document.createElement('div');
+        tag.className = 'selected-node-tag';
+        tag.innerHTML = `
+            <span>${sanitizeInput(node.text)}</span>
+            <button class="remove-tag" data-node-id="${node.id}">×</button>
+        `;
+
+        const removeBtn = tag.querySelector('.remove-tag');
+        removeBtn.addEventListener('click', () => {
+            selectedNodes = selectedNodes.filter(n => n.id !== node.id);
+            displaySelectedNodes(containerId);
+            if (selectedNodes.length === 0) {
+                closePMManagementModal();
+                closeBOMManagementModal();
+            }
+        });
+
+        container.appendChild(tag);
+    });
 }

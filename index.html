@@ -12,7 +12,7 @@
 </head>
 <body>
     <div class="logo-container">
-        <img src="assets/logo.png" alt="Company Logo" class="logo">
+        <img src="logo.png" alt="Company Logo" class="logo">
     </div>
     <div class="container" id="mainContainer">
         <div class="sidebar" id="leftPanel">
@@ -122,6 +122,8 @@
             <div class="actions">
                 <button id="addNewRecord" class="primary-button">Add New Record</button>
                 <button id="showOrphans" class="secondary-button">Show Orphan Records</button>
+                <button id="managePM" class="primary-button">Manage PM Records</button>
+                <button id="manageBOM" class="primary-button">Manage Asset BOM</button>
                 <button id="undoHierarchy" class="undo-button">Undo</button>
                 <button id="saveChanges" class="primary-button">Export Changes</button>
             </div>
@@ -137,7 +139,7 @@
         <div class="resize-handle right-handle"></div>
         <div class="edit-panel" id="rightPanel">
             <div class="logo-space">
-                <img src="assets/logo.png" alt="Company Logo" class="logo">
+                <img src="logo.png" alt="Company Logo" class="logo">
             </div>
             <div class="edit-panel-content">
                 <div class="edit-form-container">
@@ -194,6 +196,99 @@
                     <button id="saveNewRecord" class="primary-button">Save Record</button>
                     <button id="cancelNewRecord" class="secondary-button">Cancel</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Confirmation Dialog -->
+    <div id="confirmDialog" class="modal">
+        <div class="modal-content confirm-dialog">
+            <h3 id="confirmTitle">Confirm Action</h3>
+            <p id="confirmMessage">Are you sure you want to proceed?</p>
+            <div class="modal-actions">
+                <button id="confirmYes" class="primary-button">Yes</button>
+                <button id="confirmNo" class="secondary-button">No</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PM Records Management Modal -->
+    <div id="pmManagementModal" class="modal">
+        <div class="modal-content large-modal">
+            <h3>Manage PM Records</h3>
+            <div class="pm-management-container">
+                <div class="pm-section">
+                    <h4>Available PM Tasks</h4>
+                    <div class="search-box">
+                        <input type="text" id="pmSearchInput" placeholder="Search PM tasks...">
+                    </div>
+                    <div id="pmList" class="item-list">
+                        <!-- PM items will be populated here -->
+                    </div>
+                    <div class="add-pm-form">
+                        <h5>Add New PM Task</h5>
+                        <input type="text" id="newPmCode" placeholder="PM Code">
+                        <input type="text" id="newPmDescription" placeholder="Description">
+                        <input type="text" id="newPmFrequency" placeholder="Frequency">
+                        <button id="addNewPm" class="primary-button">Add PM</button>
+                    </div>
+                </div>
+                <div class="pm-section">
+                    <h4>Selected Assets/Groups</h4>
+                    <div id="selectedNodesDisplay" class="selected-nodes-display">
+                        <p class="placeholder-text">No nodes selected</p>
+                    </div>
+                    <h4>Assigned PM Tasks</h4>
+                    <div id="assignedPmList" class="item-list">
+                        <!-- Assigned PMs will be displayed here -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="savePmAssignments" class="primary-button">Save Assignments</button>
+                <button id="closePmModal" class="secondary-button">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Asset BOM Management Modal -->
+    <div id="bomManagementModal" class="modal">
+        <div class="modal-content large-modal">
+            <h3>Manage Asset BOM (Bill of Materials)</h3>
+            <div class="bom-management-container">
+                <div class="bom-section">
+                    <h4>Available Inventory Items</h4>
+                    <div class="search-box">
+                        <input type="text" id="bomSearchInput" placeholder="Search inventory...">
+                    </div>
+                    <div id="bomList" class="item-list">
+                        <!-- BOM items will be populated here -->
+                    </div>
+                    <div class="add-bom-form">
+                        <h5>Add New Inventory Item</h5>
+                        <input type="text" id="newBomPartNumber" placeholder="Part Number">
+                        <input type="text" id="newBomDescription" placeholder="Description">
+                        <input type="number" id="newBomQuantity" placeholder="Quantity" value="1">
+                        <button id="addNewBom" class="primary-button">Add Item</button>
+                    </div>
+                </div>
+                <div class="bom-section">
+                    <h4>Selected Assets/Groups</h4>
+                    <div id="selectedNodesBomDisplay" class="selected-nodes-display">
+                        <p class="placeholder-text">No nodes selected</p>
+                    </div>
+                    <h4>Assigned BOM Items</h4>
+                    <div id="assignedBomList" class="item-list">
+                        <!-- Assigned BOM items will be displayed here -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="saveBomAssignments" class="primary-button">Save Assignments</button>
+                <button id="closeBomModal" class="secondary-button">Close</button>
             </div>
         </div>
     </div>
