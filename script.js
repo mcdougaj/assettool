@@ -1149,6 +1149,7 @@ function removePMAssignment(nodeId, pmId) {
     if (assetPmAssignments[nodeId]) {
         assetPmAssignments[nodeId] = assetPmAssignments[nodeId].filter(id => id !== pmId);
         renderAssignedPMs();
+        renderPMList(document.getElementById('pmSearchInput').value); // Refresh list to update button states
         showToast('PM assignment removed', 'success');
     }
 }
@@ -1488,6 +1489,7 @@ function removeBOMAssignment(nodeId, bomId) {
     if (assetBomAssignments[nodeId]) {
         assetBomAssignments[nodeId] = assetBomAssignments[nodeId].filter(id => id !== bomId);
         renderAssignedBOMs();
+        renderBOMList(document.getElementById('bomSearchInput').value); // Refresh list to update button states
         showToast('BOM assignment removed', 'success');
     }
 }
