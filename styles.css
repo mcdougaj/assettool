@@ -369,6 +369,38 @@ body {
     box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
 }
 
+/* Form group styling for PM/BOM edit views */
+.pm-bom-detail-view .form-group {
+    margin-bottom: 15px;
+}
+
+.pm-bom-detail-view .form-group label {
+    display: block;
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+
+.pm-bom-detail-view .form-group input,
+.pm-bom-detail-view .form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 14px;
+    background-color: #ffffff;
+    color: #212529;
+    box-sizing: border-box;
+}
+
+.pm-bom-detail-view .form-group input:focus,
+.pm-bom-detail-view .form-group textarea:focus {
+    outline: none;
+    border-color: #2196f3;
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
 .edit-input.active {
     border-color: #dee2e6;
     background-color: #ffffff !important;
