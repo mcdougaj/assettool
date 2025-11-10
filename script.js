@@ -568,7 +568,15 @@ function initializeTreeView() {
                 variant: 'large'
             }
         },
-        plugins: ['dnd', 'wholerow']
+        types: {
+            'default': {},
+            'asset': {},
+            'pm-folder': {},
+            'pm-item': {},
+            'bom-folder': {},
+            'bom-item': {}
+        },
+        plugins: ['dnd', 'wholerow', 'types']
     }).on('select_node.jstree', function(e, data) {
         selectedNode = data.node;
 
