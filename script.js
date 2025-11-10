@@ -951,14 +951,12 @@ function updateSummaries() {
 function initializePMManagement() {
     const managePmBtn = document.getElementById('managePM');
     const closePmBtn = document.getElementById('closePmModal');
-    const savePmBtn = document.getElementById('savePmAssignments');
     const addPmBtn = document.getElementById('addNewPm');
     const loadPmFileBtn = document.getElementById('loadPmFile');
     const pmSearchInput = document.getElementById('pmSearchInput');
 
     managePmBtn.addEventListener('click', openPMManagementModal);
     closePmBtn.addEventListener('click', closePMManagementModal);
-    savePmBtn.addEventListener('click', savePMAssignments);
     addPmBtn.addEventListener('click', addNewPMRecord);
     loadPmFileBtn.addEventListener('click', loadPMFromFile);
     pmSearchInput.addEventListener('input', filterPMList);
@@ -1007,23 +1005,27 @@ function renderPMList(filter = '') {
     filteredPMs.forEach(pm => {
         const card = document.createElement('div');
         card.className = 'item-card';
+
+        // Check if this PM is already assigned to any selected node
+        const isAssigned = selectedNodes.some(node =>
+            assetPmAssignments[node.id] && assetPmAssignments[node.id].includes(pm.id)
+        );
+
         card.innerHTML = `
-            <input type="checkbox" data-pm-id="${pm.id}">
             <div class="item-info">
                 <div class="item-code">${sanitizeInput(pm.code)}</div>
                 <div class="item-description">${sanitizeInput(pm.description)}</div>
                 <div class="item-meta">Frequency: ${sanitizeInput(pm.frequency)} | Type: ${sanitizeInput(pm.type)}</div>
             </div>
+            <button class="item-add ${isAssigned ? 'disabled' : ''}" data-pm-id="${pm.id}" ${isAssigned ? 'disabled' : ''}>
+                ${isAssigned ? 'Added' : 'Add'}
+            </button>
         `;
 
-        const checkbox = card.querySelector('input[type="checkbox"]');
-        checkbox.addEventListener('change', (e) => {
-            if (e.target.checked) {
-                card.classList.add('selected');
-            } else {
-                card.classList.remove('selected');
-            }
-        });
+        if (!isAssigned) {
+            const addBtn = card.querySelector('.item-add');
+            addBtn.addEventListener('click', () => addPMToSelectedNodes(pm.id));
+        }
 
         pmList.appendChild(card);
     });
@@ -1065,34 +1067,30 @@ function renderAssignedPMs() {
     });
 }
 
-function savePMAssignments() {
+function addPMToSelectedNodes(pmId) {
     try {
-        const checkedBoxes = document.querySelectorAll('#pmList input[type="checkbox"]:checked');
-        const pmIds = Array.from(checkedBoxes).map(cb => cb.dataset.pmId);
-
+        let assignedCount = 0;
         selectedNodes.forEach(node => {
             if (!assetPmAssignments[node.id]) {
                 assetPmAssignments[node.id] = [];
             }
 
-            pmIds.forEach(pmId => {
-                if (!assetPmAssignments[node.id].includes(pmId)) {
-                    assetPmAssignments[node.id].push(pmId);
-                }
-            });
+            if (!assetPmAssignments[node.id].includes(pmId)) {
+                assetPmAssignments[node.id].push(pmId);
+                assignedCount++;
+            }
         });
 
         renderAssignedPMs();
+        renderPMList(document.getElementById('pmSearchInput').value); // Refresh the list to update button states
 
-        checkedBoxes.forEach(cb => {
-            cb.checked = false;
-            cb.closest('.item-card').classList.remove('selected');
-        });
-
-        showToast('PM assignments saved successfully', 'success');
+        const pm = pmRecords.find(p => p.id === pmId);
+        if (pm) {
+            showToast(`"${pm.code}" added to ${selectedNodes.length} asset(s)`, 'success');
+        }
     } catch (error) {
-        console.error('Error saving PM assignments:', error);
-        showToast('Failed to save PM assignments', 'error');
+        console.error('Error adding PM assignment:', error);
+        showToast('Failed to add PM assignment', 'error');
     }
 }
 
@@ -1210,14 +1208,12 @@ function loadPMFromFile() {
 function initializeBOMManagement() {
     const manageBomBtn = document.getElementById('manageBOM');
     const closeBomBtn = document.getElementById('closeBomModal');
-    const saveBomBtn = document.getElementById('saveBomAssignments');
     const addBomBtn = document.getElementById('addNewBom');
     const loadBomFileBtn = document.getElementById('loadBomFile');
     const bomSearchInput = document.getElementById('bomSearchInput');
 
     manageBomBtn.addEventListener('click', openBOMManagementModal);
     closeBomBtn.addEventListener('click', closeBOMManagementModal);
-    saveBomBtn.addEventListener('click', saveBOMAssignments);
     addBomBtn.addEventListener('click', addNewBOMRecord);
     loadBomFileBtn.addEventListener('click', loadBOMFromFile);
     bomSearchInput.addEventListener('input', filterBOMList);
@@ -1266,23 +1262,27 @@ function renderBOMList(filter = '') {
     filteredBOMs.forEach(bom => {
         const card = document.createElement('div');
         card.className = 'item-card';
+
+        // Check if this BOM is already assigned to any selected node
+        const isAssigned = selectedNodes.some(node =>
+            assetBomAssignments[node.id] && assetBomAssignments[node.id].includes(bom.id)
+        );
+
         card.innerHTML = `
-            <input type="checkbox" data-bom-id="${bom.id}">
             <div class="item-info">
                 <div class="item-code">${sanitizeInput(bom.partNumber)}</div>
                 <div class="item-description">${sanitizeInput(bom.description)}</div>
                 <div class="item-meta">Quantity: ${bom.quantity} ${sanitizeInput(bom.unit)}</div>
             </div>
+            <button class="item-add ${isAssigned ? 'disabled' : ''}" data-bom-id="${bom.id}" ${isAssigned ? 'disabled' : ''}>
+                ${isAssigned ? 'Added' : 'Add'}
+            </button>
         `;
 
-        const checkbox = card.querySelector('input[type="checkbox"]');
-        checkbox.addEventListener('change', (e) => {
-            if (e.target.checked) {
-                card.classList.add('selected');
-            } else {
-                card.classList.remove('selected');
-            }
-        });
+        if (!isAssigned) {
+            const addBtn = card.querySelector('.item-add');
+            addBtn.addEventListener('click', () => addBOMToSelectedNodes(bom.id));
+        }
 
         bomList.appendChild(card);
     });
@@ -1324,34 +1324,30 @@ function renderAssignedBOMs() {
     });
 }
 
-function saveBOMAssignments() {
+function addBOMToSelectedNodes(bomId) {
     try {
-        const checkedBoxes = document.querySelectorAll('#bomList input[type="checkbox"]:checked');
-        const bomIds = Array.from(checkedBoxes).map(cb => cb.dataset.bomId);
-
+        let assignedCount = 0;
         selectedNodes.forEach(node => {
             if (!assetBomAssignments[node.id]) {
                 assetBomAssignments[node.id] = [];
             }
 
-            bomIds.forEach(bomId => {
-                if (!assetBomAssignments[node.id].includes(bomId)) {
-                    assetBomAssignments[node.id].push(bomId);
-                }
-            });
+            if (!assetBomAssignments[node.id].includes(bomId)) {
+                assetBomAssignments[node.id].push(bomId);
+                assignedCount++;
+            }
         });
 
         renderAssignedBOMs();
+        renderBOMList(document.getElementById('bomSearchInput').value); // Refresh the list to update button states
 
-        checkedBoxes.forEach(cb => {
-            cb.checked = false;
-            cb.closest('.item-card').classList.remove('selected');
-        });
-
-        showToast('BOM assignments saved successfully', 'success');
+        const bom = bomRecords.find(b => b.id === bomId);
+        if (bom) {
+            showToast(`"${bom.partNumber}" added to ${selectedNodes.length} asset(s)`, 'success');
+        }
     } catch (error) {
-        console.error('Error saving BOM assignments:', error);
-        showToast('Failed to save BOM assignments', 'error');
+        console.error('Error adding BOM assignment:', error);
+        showToast('Failed to add BOM assignment', 'error');
     }
 }
 
