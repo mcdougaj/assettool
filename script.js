@@ -993,6 +993,7 @@ function updateSummaries() {
 function initializePMManagement() {
     const managePmBtn = document.getElementById('managePM');
     const closePmBtn = document.getElementById('closePmModal');
+    const closePmBtnX = document.getElementById('closePmModalX');
     const addPmBtn = document.getElementById('addNewPm');
     const loadPmFileBtn = document.getElementById('loadPmFile');
     const pmSearchInput = document.getElementById('pmSearchInput');
@@ -1000,6 +1001,7 @@ function initializePMManagement() {
 
     managePmBtn.addEventListener('click', openPMManagementModal);
     closePmBtn.addEventListener('click', closePMManagementModal);
+    closePmBtnX.addEventListener('click', closePMManagementModal);
     addPmBtn.addEventListener('click', addNewPMRecord);
     loadPmFileBtn.addEventListener('click', loadPMFromFile);
     pmSearchInput.addEventListener('input', filterPMList);
@@ -1330,6 +1332,7 @@ function copyPMFromAsset() {
 function initializeBOMManagement() {
     const manageBomBtn = document.getElementById('manageBOM');
     const closeBomBtn = document.getElementById('closeBomModal');
+    const closeBomBtnX = document.getElementById('closeBomModalX');
     const addBomBtn = document.getElementById('addNewBom');
     const loadBomFileBtn = document.getElementById('loadBomFile');
     const bomSearchInput = document.getElementById('bomSearchInput');
@@ -1337,6 +1340,7 @@ function initializeBOMManagement() {
 
     manageBomBtn.addEventListener('click', openBOMManagementModal);
     closeBomBtn.addEventListener('click', closeBOMManagementModal);
+    closeBomBtnX.addEventListener('click', closeBOMManagementModal);
     addBomBtn.addEventListener('click', addNewBOMRecord);
     loadBomFileBtn.addEventListener('click', loadBOMFromFile);
     bomSearchInput.addEventListener('input', filterBOMList);
@@ -1658,3 +1662,17 @@ function displaySelectedNodes(containerId) {
         container.appendChild(tag);
     });
 }
+
+// Close modals when clicking outside
+window.addEventListener('click', function(event) {
+    const pmModal = document.getElementById('pmManagementModal');
+    const bomModal = document.getElementById('bomManagementModal');
+
+    if (event.target === pmModal) {
+        closePMManagementModal();
+    }
+
+    if (event.target === bomModal) {
+        closeBOMManagementModal();
+    }
+});
