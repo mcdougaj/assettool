@@ -571,8 +571,19 @@ function initializeTreeView() {
         plugins: ['dnd', 'wholerow']
     }).on('select_node.jstree', function(e, data) {
         selectedNode = data.node;
-        updateEditForm(selectedNode);
-        updatePMBOMDetails(selectedNode);
+
+        // Handle different node types
+        if (data.node.type === 'pm-item' || data.node.type === 'bom-item') {
+            // Show PM/BOM item details
+            updatePMBOMItemDetails(selectedNode);
+        } else if (data.node.type === 'pm-folder' || data.node.type === 'bom-folder') {
+            // For folders, just show a summary - don't allow editing
+            showFolderSummary(selectedNode);
+        } else {
+            // Regular asset node
+            updateEditForm(selectedNode);
+            updatePMBOMDetails(selectedNode);
+        }
     }).on('move_node.jstree', function(e, data) {
         // Save current state before updating
         historyStack.push(JSON.stringify(excelData));
@@ -785,9 +796,11 @@ function updateTreeView() {
             id: value,
             children: [],
             icon: isParent ? icons[0] : icons[2],
-            data: rowData ? { ...rowData } : {} // Include all row data
+            data: rowData ? { ...rowData } : {}, // Include all row data
+            type: 'asset' // Mark as asset node
         };
 
+        // Add regular child nodes first
         if (parentChildMap.has(value)) {
             parentChildMap.get(value).forEach(({ child, description }) => {
                 const childNode = addNode(child, false, level + 1);
@@ -808,6 +821,64 @@ function updateTreeView() {
                     node.icon = icons[1]; // Change to open folder if it has children
                 }
             });
+        }
+
+        // Add PM Tasks folder if there are PM assignments
+        if (pmCount > 0) {
+            const pmFolderNode = {
+                text: `<i class="fas fa-clipboard-check"></i> PM Tasks (${pmCount})`,
+                id: `${value}_pm_folder`,
+                children: [],
+                icon: 'fas fa-clipboard-list',
+                type: 'pm-folder',
+                state: { opened: false }
+            };
+
+            const pmAssignments = assetPmAssignments[value] || [];
+            pmAssignments.forEach(pmId => {
+                const pm = pmRecords.find(p => p.id === pmId);
+                if (pm) {
+                    pmFolderNode.children.push({
+                        text: `${sanitizeInput(pm.code)} - ${sanitizeInput(pm.description)}`,
+                        id: `${value}_pm_${pmId}`,
+                        icon: 'fas fa-tasks',
+                        type: 'pm-item',
+                        data: { pmId: pmId, assetId: value, pm: pm }
+                    });
+                }
+            });
+
+            node.children.push(pmFolderNode);
+            node.icon = icons[1]; // Change to open folder
+        }
+
+        // Add BOM Items folder if there are BOM assignments
+        if (bomCount > 0) {
+            const bomFolderNode = {
+                text: `<i class="fas fa-box"></i> BOM Items (${bomCount})`,
+                id: `${value}_bom_folder`,
+                children: [],
+                icon: 'fas fa-boxes',
+                type: 'bom-folder',
+                state: { opened: false }
+            };
+
+            const bomAssignments = assetBomAssignments[value] || [];
+            bomAssignments.forEach(bomId => {
+                const bom = bomRecords.find(b => b.id === bomId);
+                if (bom) {
+                    bomFolderNode.children.push({
+                        text: `${sanitizeInput(bom.partNumber)} - ${sanitizeInput(bom.description)} (Qty: ${bom.quantity})`,
+                        id: `${value}_bom_${bomId}`,
+                        icon: 'fas fa-cube',
+                        type: 'bom-item',
+                        data: { bomId: bomId, assetId: value, bom: bom }
+                    });
+                }
+            });
+
+            node.children.push(bomFolderNode);
+            node.icon = icons[1]; // Change to open folder
         }
 
         return node;
@@ -1777,5 +1848,119 @@ function updatePMBOMDetails(node) {
         });
     } else {
         bomDetailsList.innerHTML = '<p class="placeholder-text">No BOM items assigned</p>';
+    }
+}
+
+// Show details when PM/BOM item node is clicked
+function updatePMBOMItemDetails(node) {
+    const editForm = document.getElementById('editForm');
+    const editPanelTitle = document.getElementById('editPanelTitle');
+    const pmBomDetailsSection = document.getElementById('pmBomDetailsSection');
+
+    // Hide the PM/BOM assignments section
+    pmBomDetailsSection.style.display = 'none';
+
+    if (node.type === 'pm-item' && node.data && node.data.pm) {
+        const pm = node.data.pm;
+        editPanelTitle.textContent = 'PM Task Details';
+        editForm.innerHTML = `
+            <div class="pm-bom-detail-view">
+                <div class="detail-header pm-header">
+                    <i class="fas fa-clipboard-check"></i>
+                    <h4>Preventive Maintenance Task</h4>
+                </div>
+                <div class="detail-field">
+                    <label>PM Code:</label>
+                    <div class="detail-value">${sanitizeInput(pm.code)}</div>
+                </div>
+                <div class="detail-field">
+                    <label>Description:</label>
+                    <div class="detail-value">${sanitizeInput(pm.description)}</div>
+                </div>
+                <div class="detail-field">
+                    <label>Frequency:</label>
+                    <div class="detail-value">${sanitizeInput(pm.frequency)}</div>
+                </div>
+                <div class="detail-field">
+                    <label>Type:</label>
+                    <div class="detail-value">${sanitizeInput(pm.type)}</div>
+                </div>
+                <div class="detail-field">
+                    <label>Assigned to Asset:</label>
+                    <div class="detail-value">${sanitizeInput(node.data.assetId)}</div>
+                </div>
+            </div>
+        `;
+    } else if (node.type === 'bom-item' && node.data && node.data.bom) {
+        const bom = node.data.bom;
+        editPanelTitle.textContent = 'BOM Item Details';
+        editForm.innerHTML = `
+            <div class="pm-bom-detail-view">
+                <div class="detail-header bom-header">
+                    <i class="fas fa-box"></i>
+                    <h4>Bill of Materials Item</h4>
+                </div>
+                <div class="detail-field">
+                    <label>Part Number:</label>
+                    <div class="detail-value">${sanitizeInput(bom.partNumber)}</div>
+                </div>
+                <div class="detail-field">
+                    <label>Description:</label>
+                    <div class="detail-value">${sanitizeInput(bom.description)}</div>
+                </div>
+                <div class="detail-field">
+                    <label>Quantity:</label>
+                    <div class="detail-value">${bom.quantity} ${sanitizeInput(bom.unit)}</div>
+                </div>
+                <div class="detail-field">
+                    <label>Assigned to Asset:</label>
+                    <div class="detail-value">${sanitizeInput(node.data.assetId)}</div>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// Show folder summary
+function showFolderSummary(node) {
+    const editForm = document.getElementById('editForm');
+    const editPanelTitle = document.getElementById('editPanelTitle');
+    const pmBomDetailsSection = document.getElementById('pmBomDetailsSection');
+
+    // Hide the PM/BOM assignments section
+    pmBomDetailsSection.style.display = 'none';
+
+    const childCount = node.children ? node.children.length : 0;
+
+    if (node.type === 'pm-folder') {
+        editPanelTitle.textContent = 'PM Tasks Folder';
+        editForm.innerHTML = `
+            <div class="pm-bom-detail-view">
+                <div class="detail-header pm-header">
+                    <i class="fas fa-clipboard-list"></i>
+                    <h4>PM Tasks Collection</h4>
+                </div>
+                <div class="detail-field">
+                    <label>Total PM Tasks:</label>
+                    <div class="detail-value">${childCount}</div>
+                </div>
+                <p class="placeholder-text">Expand this folder to view individual PM tasks</p>
+            </div>
+        `;
+    } else if (node.type === 'bom-folder') {
+        editPanelTitle.textContent = 'BOM Items Folder';
+        editForm.innerHTML = `
+            <div class="pm-bom-detail-view">
+                <div class="detail-header bom-header">
+                    <i class="fas fa-boxes"></i>
+                    <h4>BOM Items Collection</h4>
+                </div>
+                <div class="detail-field">
+                    <label>Total BOM Items:</label>
+                    <div class="detail-value">${childCount}</div>
+                </div>
+                <p class="placeholder-text">Expand this folder to view individual BOM items</p>
+            </div>
+        `;
     }
 }

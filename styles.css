@@ -261,6 +261,63 @@ body {
     font-size: 12px;
 }
 
+/* PM/BOM Detail View */
+.pm-bom-detail-view {
+    padding: 20px;
+}
+
+.detail-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+}
+
+.detail-header.pm-header {
+    background-color: #e3f2fd;
+    color: #1976d2;
+    border-left: 4px solid #2196f3;
+}
+
+.detail-header.bom-header {
+    background-color: #e8f5e9;
+    color: #388e3c;
+    border-left: 4px solid #4caf50;
+}
+
+.detail-header i {
+    font-size: 24px;
+}
+
+.detail-header h4 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.detail-field {
+    margin-bottom: 15px;
+    padding: 12px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+}
+
+.detail-field label {
+    display: block;
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+
+.detail-value {
+    color: #212529;
+    font-size: 14px;
+    padding: 4px 0;
+}
+
 .edit-input.active {
     border-color: #dee2e6;
     background-color: #ffffff !important;
