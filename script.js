@@ -953,12 +953,14 @@ function initializePMManagement() {
     const closePmBtn = document.getElementById('closePmModal');
     const savePmBtn = document.getElementById('savePmAssignments');
     const addPmBtn = document.getElementById('addNewPm');
+    const loadPmFileBtn = document.getElementById('loadPmFile');
     const pmSearchInput = document.getElementById('pmSearchInput');
 
     managePmBtn.addEventListener('click', openPMManagementModal);
     closePmBtn.addEventListener('click', closePMManagementModal);
     savePmBtn.addEventListener('click', savePMAssignments);
     addPmBtn.addEventListener('click', addNewPMRecord);
+    loadPmFileBtn.addEventListener('click', loadPMFromFile);
     pmSearchInput.addEventListener('input', filterPMList);
 }
 
@@ -1140,18 +1142,84 @@ function filterPMList() {
     renderPMList(filter);
 }
 
+function loadPMFromFile() {
+    try {
+        const fileInput = document.getElementById('pmFileInput');
+        const file = fileInput.files[0];
+
+        if (!file) {
+            showToast('Please select a file first', 'warning');
+            return;
+        }
+
+        if (!validateFileSize(file)) {
+            return;
+        }
+
+        showLoading('Loading PM records...');
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+                // Expected columns: Code, Description, Frequency, Type
+                let loadedCount = 0;
+                jsonData.forEach(row => {
+                    if (row.Code && row.Description && row.Frequency) {
+                        const newPM = {
+                            id: 'PM' + Date.now() + '_' + loadedCount,
+                            code: sanitizeInput(row.Code.toString()),
+                            description: sanitizeInput(row.Description.toString()),
+                            frequency: sanitizeInput(row.Frequency.toString()),
+                            type: row.Type ? sanitizeInput(row.Type.toString()) : 'Imported'
+                        };
+                        pmRecords.push(newPM);
+                        loadedCount++;
+                    }
+                });
+
+                renderPMList();
+                fileInput.value = ''; // Clear file input
+                hideLoading();
+                showToast(`Loaded ${loadedCount} PM records successfully`, 'success');
+            } catch (error) {
+                hideLoading();
+                console.error('Error reading PM file:', error);
+                showToast('Failed to read PM file. Please check the format (Code, Description, Frequency, Type columns required)', 'error');
+            }
+        };
+
+        reader.onerror = function() {
+            hideLoading();
+            showToast('Failed to read file', 'error');
+        };
+
+        reader.readAsArrayBuffer(file);
+    } catch (error) {
+        hideLoading();
+        console.error('Error loading PM file:', error);
+        showToast('An error occurred while loading the PM file', 'error');
+    }
+}
+
 // BOM Management Functions
 function initializeBOMManagement() {
     const manageBomBtn = document.getElementById('manageBOM');
     const closeBomBtn = document.getElementById('closeBomModal');
     const saveBomBtn = document.getElementById('saveBomAssignments');
     const addBomBtn = document.getElementById('addNewBom');
+    const loadBomFileBtn = document.getElementById('loadBomFile');
     const bomSearchInput = document.getElementById('bomSearchInput');
 
     manageBomBtn.addEventListener('click', openBOMManagementModal);
     closeBomBtn.addEventListener('click', closeBOMManagementModal);
     saveBomBtn.addEventListener('click', saveBOMAssignments);
     addBomBtn.addEventListener('click', addNewBOMRecord);
+    loadBomFileBtn.addEventListener('click', loadBOMFromFile);
     bomSearchInput.addEventListener('input', filterBOMList);
 }
 
@@ -1333,6 +1401,70 @@ function filterBOMList() {
     renderBOMList(filter);
 }
 
+function loadBOMFromFile() {
+    try {
+        const fileInput = document.getElementById('bomFileInput');
+        const file = fileInput.files[0];
+
+        if (!file) {
+            showToast('Please select a file first', 'warning');
+            return;
+        }
+
+        if (!validateFileSize(file)) {
+            return;
+        }
+
+        showLoading('Loading inventory items...');
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+                // Expected columns: PartNumber, Description, Quantity, Unit
+                let loadedCount = 0;
+                jsonData.forEach(row => {
+                    if (row.PartNumber && row.Description) {
+                        const newBOM = {
+                            id: 'BOM' + Date.now() + '_' + loadedCount,
+                            partNumber: sanitizeInput(row.PartNumber.toString()),
+                            description: sanitizeInput(row.Description.toString()),
+                            quantity: row.Quantity ? parseInt(row.Quantity) : 1,
+                            unit: row.Unit ? sanitizeInput(row.Unit.toString()) : 'pcs'
+                        };
+                        bomRecords.push(newBOM);
+                        loadedCount++;
+                    }
+                });
+
+                renderBOMList();
+                fileInput.value = ''; // Clear file input
+                hideLoading();
+                showToast(`Loaded ${loadedCount} inventory items successfully`, 'success');
+            } catch (error) {
+                hideLoading();
+                console.error('Error reading BOM file:', error);
+                showToast('Failed to read inventory file. Please check the format (PartNumber, Description, Quantity, Unit columns required)', 'error');
+            }
+        };
+
+        reader.onerror = function() {
+            hideLoading();
+            showToast('Failed to read file', 'error');
+        };
+
+        reader.readAsArrayBuffer(file);
+    } catch (error) {
+        hideLoading();
+        console.error('Error loading BOM file:', error);
+        showToast('An error occurred while loading the inventory file', 'error');
+    }
+}
+
 function displaySelectedNodes(containerId) {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
@@ -1354,10 +1486,8 @@ function displaySelectedNodes(containerId) {
         removeBtn.addEventListener('click', () => {
             selectedNodes = selectedNodes.filter(n => n.id !== node.id);
             displaySelectedNodes(containerId);
-            if (selectedNodes.length === 0) {
-                closePMManagementModal();
-                closeBOMManagementModal();
-            }
+            // Don't auto-close modals when removing nodes
+            // User can use the Close button to close the modal
         });
 
         container.appendChild(tag);

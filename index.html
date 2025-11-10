@@ -229,6 +229,9 @@
                         <!-- PM items will be populated here -->
                     </div>
                     <div class="add-pm-form">
+                        <h5>Load PM Tasks from File</h5>
+                        <input type="file" id="pmFileInput" accept=".xlsx, .xls">
+                        <button id="loadPmFile" class="secondary-button">Load PM File</button>
                         <h5>Add New PM Task</h5>
                         <input type="text" id="newPmCode" placeholder="PM Code">
                         <input type="text" id="newPmDescription" placeholder="Description">
@@ -268,6 +271,9 @@
                         <!-- BOM items will be populated here -->
                     </div>
                     <div class="add-bom-form">
+                        <h5>Load Inventory from File</h5>
+                        <input type="file" id="bomFileInput" accept=".xlsx, .xls">
+                        <button id="loadBomFile" class="secondary-button">Load Inventory File</button>
                         <h5>Add New Inventory Item</h5>
                         <input type="text" id="newBomPartNumber" placeholder="Part Number">
                         <input type="text" id="newBomDescription" placeholder="Description">

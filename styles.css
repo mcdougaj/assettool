@@ -998,6 +998,13 @@ input[type="file"] {
     font-size: 14px;
 }
 
+.add-pm-form input[type="file"],
+.add-bom-form input[type="file"] {
+    padding: 6px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
 .add-pm-form button,
 .add-bom-form button {
     width: 100%;
