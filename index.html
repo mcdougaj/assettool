@@ -244,6 +244,16 @@
                     <div id="selectedNodesDisplay" class="selected-nodes-display">
                         <p class="placeholder-text">No nodes selected</p>
                     </div>
+                    <div id="affectedNodesInfo" class="affected-nodes-info" style="display: none;">
+                        <small>Will apply to <strong id="affectedNodesCount">0</strong> asset(s) including child items</small>
+                    </div>
+                    <div class="copy-from-section">
+                        <h5>Copy PM from Existing Asset</h5>
+                        <select id="pmCopySource" class="copy-source-select">
+                            <option value="">-- Select Asset --</option>
+                        </select>
+                        <button id="copyPmBtn" class="secondary-button">Copy PM Tasks</button>
+                    </div>
                     <h4>Assigned PM Tasks</h4>
                     <div id="assignedPmList" class="item-list">
                         <!-- Assigned PMs will be displayed here -->
@@ -284,6 +294,16 @@
                     <h4>Selected Assets/Groups</h4>
                     <div id="selectedNodesBomDisplay" class="selected-nodes-display">
                         <p class="placeholder-text">No nodes selected</p>
+                    </div>
+                    <div id="affectedNodesBomInfo" class="affected-nodes-info" style="display: none;">
+                        <small>Will apply to <strong id="affectedNodesBomCount">0</strong> asset(s) including child items</small>
+                    </div>
+                    <div class="copy-from-section">
+                        <h5>Copy BOM from Existing Asset</h5>
+                        <select id="bomCopySource" class="copy-source-select">
+                            <option value="">-- Select Asset --</option>
+                        </select>
+                        <button id="copyBomBtn" class="secondary-button">Copy BOM Items</button>
                     </div>
                     <h4>Assigned BOM Items</h4>
                     <div id="assignedBomList" class="item-list">

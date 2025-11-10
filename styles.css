@@ -1072,6 +1072,49 @@ input[type="file"] {
     transform: none;
 }
 
+/* Copy from asset section */
+.copy-from-section {
+    background-color: white;
+    padding: 12px;
+    border-radius: 4px;
+    margin: 15px 0;
+    border: 1px solid #dee2e6;
+}
+
+.copy-from-section h5 {
+    margin: 0 0 10px 0;
+    color: #495057;
+    font-size: 14px;
+}
+
+.copy-source-select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    font-size: 14px;
+    background-color: white;
+}
+
+.copy-from-section button {
+    width: 100%;
+    padding: 8px;
+}
+
+.affected-nodes-info {
+    background-color: #e3f2fd;
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin: 10px 0;
+    color: #1976d2;
+    font-size: 13px;
+}
+
+.affected-nodes-info strong {
+    color: #0d47a1;
+}
+
 /* Multi-select indicator */
 .jstree-checkbox-selection .jstree-clicked {
     background-color: #e3f2fd !important;

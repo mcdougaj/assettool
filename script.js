@@ -128,6 +128,48 @@ function getSelectedTreeNodes() {
     return selected;
 }
 
+// Get all child nodes recursively for a given node
+function getAllChildNodes(nodeId) {
+    const tree = $('#treeView').jstree(true);
+    const node = tree.get_node(nodeId);
+    const children = [];
+
+    function collectChildren(n) {
+        if (n.children && n.children.length > 0) {
+            n.children.forEach(childId => {
+                const childNode = tree.get_node(childId);
+                children.push(childNode);
+                collectChildren(childNode);
+            });
+        }
+    }
+
+    collectChildren(node);
+    return children;
+}
+
+// Get all nodes that will be affected (includes children if parent selected)
+function getAffectedNodes(selectedNodes) {
+    const affected = new Set();
+
+    selectedNodes.forEach(node => {
+        affected.add(node.id);
+        const children = getAllChildNodes(node.id);
+        children.forEach(child => affected.add(child.id));
+    });
+
+    return Array.from(affected);
+}
+
+// Get all assets (leaf nodes and parents) for the copy dropdown
+function getAllAssetNodes() {
+    const tree = $('#treeView').jstree(true);
+    if (!tree) return [];
+
+    const allNodes = tree.get_json('#', { flat: true });
+    return allNodes.filter(node => node.id !== '#');
+}
+
 // Initialize sample PM and BOM data
 function initializeSampleData() {
     pmRecords = [
@@ -954,12 +996,14 @@ function initializePMManagement() {
     const addPmBtn = document.getElementById('addNewPm');
     const loadPmFileBtn = document.getElementById('loadPmFile');
     const pmSearchInput = document.getElementById('pmSearchInput');
+    const copyPmBtn = document.getElementById('copyPmBtn');
 
     managePmBtn.addEventListener('click', openPMManagementModal);
     closePmBtn.addEventListener('click', closePMManagementModal);
     addPmBtn.addEventListener('click', addNewPMRecord);
     loadPmFileBtn.addEventListener('click', loadPMFromFile);
     pmSearchInput.addEventListener('input', filterPMList);
+    copyPmBtn.addEventListener('click', copyPMFromAsset);
 }
 
 function openPMManagementModal() {
@@ -974,6 +1018,8 @@ function openPMManagementModal() {
         modal.classList.add('show');
 
         displaySelectedNodes('selectedNodesDisplay');
+        populateCopySourceDropdown('pmCopySource');
+        updateAffectedNodesCount('affectedNodesCount', 'affectedNodesInfo');
         renderPMList();
         renderAssignedPMs();
     } catch (error) {
@@ -1069,14 +1115,17 @@ function renderAssignedPMs() {
 
 function addPMToSelectedNodes(pmId) {
     try {
+        // Get all affected nodes (includes children of parent nodes)
+        const affectedNodeIds = getAffectedNodes(selectedNodes);
+
         let assignedCount = 0;
-        selectedNodes.forEach(node => {
-            if (!assetPmAssignments[node.id]) {
-                assetPmAssignments[node.id] = [];
+        affectedNodeIds.forEach(nodeId => {
+            if (!assetPmAssignments[nodeId]) {
+                assetPmAssignments[nodeId] = [];
             }
 
-            if (!assetPmAssignments[node.id].includes(pmId)) {
-                assetPmAssignments[node.id].push(pmId);
+            if (!assetPmAssignments[nodeId].includes(pmId)) {
+                assetPmAssignments[nodeId].push(pmId);
                 assignedCount++;
             }
         });
@@ -1086,7 +1135,7 @@ function addPMToSelectedNodes(pmId) {
 
         const pm = pmRecords.find(p => p.id === pmId);
         if (pm) {
-            showToast(`"${pm.code}" added to ${selectedNodes.length} asset(s)`, 'success');
+            showToast(`"${pm.code}" added to ${affectedNodeIds.length} asset(s)`, 'success');
         }
     } catch (error) {
         console.error('Error adding PM assignment:', error);
@@ -1204,6 +1253,79 @@ function loadPMFromFile() {
     }
 }
 
+// Helper function to populate copy source dropdown
+function populateCopySourceDropdown(dropdownId) {
+    const dropdown = document.getElementById(dropdownId);
+    dropdown.innerHTML = '<option value="">-- Select Asset --</option>';
+
+    const allNodes = getAllAssetNodes();
+    allNodes.forEach(node => {
+        const option = document.createElement('option');
+        option.value = node.id;
+        option.textContent = node.text;
+        dropdown.appendChild(option);
+    });
+}
+
+// Helper function to update affected nodes count display
+function updateAffectedNodesCount(countElementId, infoElementId) {
+    const affectedNodeIds = getAffectedNodes(selectedNodes);
+    const countElement = document.getElementById(countElementId);
+    const infoElement = document.getElementById(infoElementId);
+
+    if (countElement) {
+        countElement.textContent = affectedNodeIds.length;
+    }
+
+    if (infoElement) {
+        if (affectedNodeIds.length > selectedNodes.length) {
+            infoElement.style.display = 'block';
+        } else {
+            infoElement.style.display = 'none';
+        }
+    }
+}
+
+// Copy PM assignments from source asset to selected assets
+function copyPMFromAsset() {
+    try {
+        const sourceNodeId = document.getElementById('pmCopySource').value;
+        if (!sourceNodeId) {
+            showToast('Please select a source asset to copy from', 'warning');
+            return;
+        }
+
+        const sourcePMs = assetPmAssignments[sourceNodeId] || [];
+        if (sourcePMs.length === 0) {
+            showToast('Selected asset has no PM tasks assigned', 'info');
+            return;
+        }
+
+        const affectedNodeIds = getAffectedNodes(selectedNodes);
+        affectedNodeIds.forEach(nodeId => {
+            if (!assetPmAssignments[nodeId]) {
+                assetPmAssignments[nodeId] = [];
+            }
+            // Copy all PMs from source, avoiding duplicates
+            sourcePMs.forEach(pmId => {
+                if (!assetPmAssignments[nodeId].includes(pmId)) {
+                    assetPmAssignments[nodeId].push(pmId);
+                }
+            });
+        });
+
+        renderAssignedPMs();
+        renderPMList(document.getElementById('pmSearchInput').value);
+
+        const tree = $('#treeView').jstree(true);
+        const sourceNode = tree.get_node(sourceNodeId);
+        showToast(`Copied ${sourcePMs.length} PM task(s) from "${sourceNode.text}" to ${affectedNodeIds.length} asset(s)`, 'success');
+    } catch (error) {
+        console.error('Error copying PM assignments:', error);
+        showToast('Failed to copy PM assignments', 'error');
+    }
+}
+
 // BOM Management Functions
 function initializeBOMManagement() {
     const manageBomBtn = document.getElementById('manageBOM');
@@ -1211,12 +1333,14 @@ function initializeBOMManagement() {
     const addBomBtn = document.getElementById('addNewBom');
     const loadBomFileBtn = document.getElementById('loadBomFile');
     const bomSearchInput = document.getElementById('bomSearchInput');
+    const copyBomBtn = document.getElementById('copyBomBtn');
 
     manageBomBtn.addEventListener('click', openBOMManagementModal);
     closeBomBtn.addEventListener('click', closeBOMManagementModal);
     addBomBtn.addEventListener('click', addNewBOMRecord);
     loadBomFileBtn.addEventListener('click', loadBOMFromFile);
     bomSearchInput.addEventListener('input', filterBOMList);
+    copyBomBtn.addEventListener('click', copyBOMFromAsset);
 }
 
 function openBOMManagementModal() {
@@ -1231,6 +1355,8 @@ function openBOMManagementModal() {
         modal.classList.add('show');
 
         displaySelectedNodes('selectedNodesBomDisplay');
+        populateCopySourceDropdown('bomCopySource');
+        updateAffectedNodesCount('affectedNodesBomCount', 'affectedNodesBomInfo');
         renderBOMList();
         renderAssignedBOMs();
     } catch (error) {
@@ -1326,14 +1452,17 @@ function renderAssignedBOMs() {
 
 function addBOMToSelectedNodes(bomId) {
     try {
+        // Get all affected nodes (includes children of parent nodes)
+        const affectedNodeIds = getAffectedNodes(selectedNodes);
+
         let assignedCount = 0;
-        selectedNodes.forEach(node => {
-            if (!assetBomAssignments[node.id]) {
-                assetBomAssignments[node.id] = [];
+        affectedNodeIds.forEach(nodeId => {
+            if (!assetBomAssignments[nodeId]) {
+                assetBomAssignments[nodeId] = [];
             }
 
-            if (!assetBomAssignments[node.id].includes(bomId)) {
-                assetBomAssignments[node.id].push(bomId);
+            if (!assetBomAssignments[nodeId].includes(bomId)) {
+                assetBomAssignments[nodeId].push(bomId);
                 assignedCount++;
             }
         });
@@ -1343,7 +1472,7 @@ function addBOMToSelectedNodes(bomId) {
 
         const bom = bomRecords.find(b => b.id === bomId);
         if (bom) {
-            showToast(`"${bom.partNumber}" added to ${selectedNodes.length} asset(s)`, 'success');
+            showToast(`"${bom.partNumber}" added to ${affectedNodeIds.length} asset(s)`, 'success');
         }
     } catch (error) {
         console.error('Error adding BOM assignment:', error);
@@ -1458,6 +1587,46 @@ function loadBOMFromFile() {
         hideLoading();
         console.error('Error loading BOM file:', error);
         showToast('An error occurred while loading the inventory file', 'error');
+    }
+}
+
+// Copy BOM assignments from source asset to selected assets
+function copyBOMFromAsset() {
+    try {
+        const sourceNodeId = document.getElementById('bomCopySource').value;
+        if (!sourceNodeId) {
+            showToast('Please select a source asset to copy from', 'warning');
+            return;
+        }
+
+        const sourceBOMs = assetBomAssignments[sourceNodeId] || [];
+        if (sourceBOMs.length === 0) {
+            showToast('Selected asset has no BOM items assigned', 'info');
+            return;
+        }
+
+        const affectedNodeIds = getAffectedNodes(selectedNodes);
+        affectedNodeIds.forEach(nodeId => {
+            if (!assetBomAssignments[nodeId]) {
+                assetBomAssignments[nodeId] = [];
+            }
+            // Copy all BOMs from source, avoiding duplicates
+            sourceBOMs.forEach(bomId => {
+                if (!assetBomAssignments[nodeId].includes(bomId)) {
+                    assetBomAssignments[nodeId].push(bomId);
+                }
+            });
+        });
+
+        renderAssignedBOMs();
+        renderBOMList(document.getElementById('bomSearchInput').value);
+
+        const tree = $('#treeView').jstree(true);
+        const sourceNode = tree.get_node(sourceNodeId);
+        showToast(`Copied ${sourceBOMs.length} BOM item(s) from "${sourceNode.text}" to ${affectedNodeIds.length} asset(s)`, 'success');
+    } catch (error) {
+        console.error('Error copying BOM assignments:', error);
+        showToast('Failed to copy BOM assignments', 'error');
     }
 }
 
