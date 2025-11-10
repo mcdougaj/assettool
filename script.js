@@ -1867,62 +1867,91 @@ function updatePMBOMItemDetails(node) {
 
     if (node.type === 'pm-item' && node.data && node.data.pm) {
         const pm = node.data.pm;
-        editPanelTitle.textContent = 'PM Task Details';
+        editPanelTitle.textContent = 'Edit PM Task';
         editForm.innerHTML = `
             <div class="pm-bom-detail-view">
                 <div class="detail-header pm-header">
                     <i class="fas fa-clipboard-check"></i>
                     <h4>Preventive Maintenance Task</h4>
                 </div>
-                <div class="detail-field">
+                <div class="form-group">
                     <label>PM Code:</label>
-                    <div class="detail-value">${sanitizeInput(pm.code)}</div>
+                    <input type="text" id="editPmCode" class="edit-input" value="${sanitizeInput(pm.code)}">
                 </div>
-                <div class="detail-field">
+                <div class="form-group">
                     <label>Description:</label>
-                    <div class="detail-value">${sanitizeInput(pm.description)}</div>
+                    <textarea id="editPmDescription" class="edit-input" rows="3">${sanitizeInput(pm.description)}</textarea>
                 </div>
-                <div class="detail-field">
+                <div class="form-group">
                     <label>Frequency:</label>
-                    <div class="detail-value">${sanitizeInput(pm.frequency)}</div>
+                    <input type="text" id="editPmFrequency" class="edit-input" value="${sanitizeInput(pm.frequency)}">
                 </div>
-                <div class="detail-field">
+                <div class="form-group">
                     <label>Type:</label>
-                    <div class="detail-value">${sanitizeInput(pm.type)}</div>
+                    <input type="text" id="editPmType" class="edit-input" value="${sanitizeInput(pm.type)}">
                 </div>
                 <div class="detail-field">
                     <label>Assigned to Asset:</label>
                     <div class="detail-value">${sanitizeInput(node.data.assetId)}</div>
                 </div>
+                <div class="pm-bom-actions">
+                    <button id="savePmEdit" class="primary-button" data-pm-id="${pm.id}">
+                        <i class="fas fa-save"></i> Save Changes
+                    </button>
+                    <button id="deletePmFromAsset" class="danger-button" data-pm-id="${pm.id}" data-asset-id="${node.data.assetId}">
+                        <i class="fas fa-trash"></i> Remove from Asset
+                    </button>
+                </div>
             </div>
         `;
+
+        // Attach event listeners
+        document.getElementById('savePmEdit').addEventListener('click', () => savePMEdit(pm.id));
+        document.getElementById('deletePmFromAsset').addEventListener('click', () => removePMFromAsset(pm.id, node.data.assetId));
+
     } else if (node.type === 'bom-item' && node.data && node.data.bom) {
         const bom = node.data.bom;
-        editPanelTitle.textContent = 'BOM Item Details';
+        editPanelTitle.textContent = 'Edit BOM Item';
         editForm.innerHTML = `
             <div class="pm-bom-detail-view">
                 <div class="detail-header bom-header">
                     <i class="fas fa-box"></i>
                     <h4>Bill of Materials Item</h4>
                 </div>
-                <div class="detail-field">
+                <div class="form-group">
                     <label>Part Number:</label>
-                    <div class="detail-value">${sanitizeInput(bom.partNumber)}</div>
+                    <input type="text" id="editBomPartNumber" class="edit-input" value="${sanitizeInput(bom.partNumber)}">
                 </div>
-                <div class="detail-field">
+                <div class="form-group">
                     <label>Description:</label>
-                    <div class="detail-value">${sanitizeInput(bom.description)}</div>
+                    <textarea id="editBomDescription" class="edit-input" rows="3">${sanitizeInput(bom.description)}</textarea>
                 </div>
-                <div class="detail-field">
+                <div class="form-group">
                     <label>Quantity:</label>
-                    <div class="detail-value">${bom.quantity} ${sanitizeInput(bom.unit)}</div>
+                    <input type="number" id="editBomQuantity" class="edit-input" value="${bom.quantity}" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Unit:</label>
+                    <input type="text" id="editBomUnit" class="edit-input" value="${sanitizeInput(bom.unit)}">
                 </div>
                 <div class="detail-field">
                     <label>Assigned to Asset:</label>
                     <div class="detail-value">${sanitizeInput(node.data.assetId)}</div>
                 </div>
+                <div class="pm-bom-actions">
+                    <button id="saveBomEdit" class="primary-button" data-bom-id="${bom.id}">
+                        <i class="fas fa-save"></i> Save Changes
+                    </button>
+                    <button id="deleteBomFromAsset" class="danger-button" data-bom-id="${bom.id}" data-asset-id="${node.data.assetId}">
+                        <i class="fas fa-trash"></i> Remove from Asset
+                    </button>
+                </div>
             </div>
         `;
+
+        // Attach event listeners
+        document.getElementById('saveBomEdit').addEventListener('click', () => saveBOMEdit(bom.id));
+        document.getElementById('deleteBomFromAsset').addEventListener('click', () => removeBOMFromAsset(bom.id, node.data.assetId));
     }
 }
 
@@ -1967,5 +1996,112 @@ function showFolderSummary(node) {
                 <p class="placeholder-text">Expand this folder to view individual BOM items</p>
             </div>
         `;
+    }
+}
+
+// Save PM task edits
+function savePMEdit(pmId) {
+    try {
+        const code = document.getElementById('editPmCode').value.trim();
+        const description = document.getElementById('editPmDescription').value.trim();
+        const frequency = document.getElementById('editPmFrequency').value.trim();
+        const type = document.getElementById('editPmType').value.trim();
+
+        if (!code || !description || !frequency) {
+            showToast('Please fill in all required fields', 'warning');
+            return;
+        }
+
+        // Find and update the PM record
+        const pmIndex = pmRecords.findIndex(p => p.id === pmId);
+        if (pmIndex !== -1) {
+            pmRecords[pmIndex].code = code;
+            pmRecords[pmIndex].description = description;
+            pmRecords[pmIndex].frequency = frequency;
+            pmRecords[pmIndex].type = type;
+
+            updateTreeView(); // Refresh tree to show updated names
+            showToast('PM task updated successfully', 'success');
+        }
+    } catch (error) {
+        console.error('Error saving PM edit:', error);
+        showToast('Failed to save PM task', 'error');
+    }
+}
+
+// Save BOM item edits
+function saveBOMEdit(bomId) {
+    try {
+        const partNumber = document.getElementById('editBomPartNumber').value.trim();
+        const description = document.getElementById('editBomDescription').value.trim();
+        const quantity = parseFloat(document.getElementById('editBomQuantity').value);
+        const unit = document.getElementById('editBomUnit').value.trim();
+
+        if (!partNumber || !description || !quantity || !unit) {
+            showToast('Please fill in all required fields', 'warning');
+            return;
+        }
+
+        if (quantity <= 0) {
+            showToast('Quantity must be greater than 0', 'warning');
+            return;
+        }
+
+        // Find and update the BOM record
+        const bomIndex = bomRecords.findIndex(b => b.id === bomId);
+        if (bomIndex !== -1) {
+            bomRecords[bomIndex].partNumber = partNumber;
+            bomRecords[bomIndex].description = description;
+            bomRecords[bomIndex].quantity = quantity;
+            bomRecords[bomIndex].unit = unit;
+
+            updateTreeView(); // Refresh tree to show updated names
+            showToast('BOM item updated successfully', 'success');
+        }
+    } catch (error) {
+        console.error('Error saving BOM edit:', error);
+        showToast('Failed to save BOM item', 'error');
+    }
+}
+
+// Remove PM from specific asset
+function removePMFromAsset(pmId, assetId) {
+    try {
+        if (assetPmAssignments[assetId]) {
+            assetPmAssignments[assetId] = assetPmAssignments[assetId].filter(id => id !== pmId);
+            updateTreeView(); // Refresh tree to update badges and remove node
+
+            // Clear the edit form since the node will be removed
+            const editForm = document.getElementById('editForm');
+            const editPanelTitle = document.getElementById('editPanelTitle');
+            editPanelTitle.textContent = 'Edit Record';
+            editForm.innerHTML = '<p class="placeholder-text">Select a node in the tree to edit its values</p>';
+
+            showToast('PM task removed from asset', 'success');
+        }
+    } catch (error) {
+        console.error('Error removing PM from asset:', error);
+        showToast('Failed to remove PM task', 'error');
+    }
+}
+
+// Remove BOM from specific asset
+function removeBOMFromAsset(bomId, assetId) {
+    try {
+        if (assetBomAssignments[assetId]) {
+            assetBomAssignments[assetId] = assetBomAssignments[assetId].filter(id => id !== bomId);
+            updateTreeView(); // Refresh tree to update badges and remove node
+
+            // Clear the edit form since the node will be removed
+            const editForm = document.getElementById('editForm');
+            const editPanelTitle = document.getElementById('editPanelTitle');
+            editPanelTitle.textContent = 'Edit Record';
+            editForm.innerHTML = '<p class="placeholder-text">Select a node in the tree to edit its values</p>';
+
+            showToast('BOM item removed from asset', 'success');
+        }
+    } catch (error) {
+        console.error('Error removing BOM from asset:', error);
+        showToast('Failed to remove BOM item', 'error');
     }
 }
