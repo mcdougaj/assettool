@@ -572,17 +572,22 @@ function initializeTreeView() {
     }).on('select_node.jstree', function(e, data) {
         selectedNode = data.node;
 
-        // Handle different node types
+        // Hide PM/BOM details section by default
+        const pmBomDetailsSection = document.getElementById('pmBomDetailsSection');
+        if (pmBomDetailsSection) {
+            pmBomDetailsSection.style.display = 'none';
+        }
+
+        // Handle different node types - show only relevant data
         if (data.node.type === 'pm-item' || data.node.type === 'bom-item') {
-            // Show PM/BOM item details
+            // Show only PM/BOM item details
             updatePMBOMItemDetails(selectedNode);
         } else if (data.node.type === 'pm-folder' || data.node.type === 'bom-folder') {
-            // For folders, just show a summary - don't allow editing
+            // Show only folder summary
             showFolderSummary(selectedNode);
         } else {
-            // Regular asset node
+            // Show only asset edit form (no PM/BOM details)
             updateEditForm(selectedNode);
-            updatePMBOMDetails(selectedNode);
         }
     }).on('move_node.jstree', function(e, data) {
         // Save current state before updating
