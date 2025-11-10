@@ -384,14 +384,18 @@ body {
 
 .pm-bom-detail-view .form-group input,
 .pm-bom-detail-view .form-group textarea {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    font-size: 14px;
-    background-color: #ffffff;
-    color: #212529;
-    box-sizing: border-box;
+    display: block !important;
+    width: 100% !important;
+    padding: 10px !important;
+    border: 1px solid #dee2e6 !important;
+    border-radius: 4px !important;
+    font-size: 14px !important;
+    background-color: #ffffff !important;
+    color: #212529 !important;
+    box-sizing: border-box !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    height: auto !important;
 }
 
 .pm-bom-detail-view .form-group input:focus,

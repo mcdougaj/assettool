@@ -1134,7 +1134,7 @@ function openPMManagementModal() {
 function closePMManagementModal() {
     const modal = document.getElementById('pmManagementModal');
     modal.classList.remove('show');
-    selectedNodes = [];
+    // Don't clear selectedNodes - keep them selected for other operations
 }
 
 function renderPMList(filter = '') {
@@ -1477,7 +1477,7 @@ function openBOMManagementModal() {
 function closeBOMManagementModal() {
     const modal = document.getElementById('bomManagementModal');
     modal.classList.remove('show');
-    selectedNodes = [];
+    // Don't clear selectedNodes - keep them selected for other operations
 }
 
 function renderBOMList(filter = '') {
