@@ -263,7 +263,14 @@ body {
 
 /* PM/BOM Detail View */
 .pm-bom-detail-view {
-    padding: 20px;
+    padding: 20px !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.pm-bom-detail-view * {
+    visibility: visible !important;
 }
 
 .detail-header {
@@ -396,6 +403,11 @@ body {
     opacity: 1 !important;
     visibility: visible !important;
     height: auto !important;
+    min-height: 40px !important;
+}
+
+.pm-bom-detail-view .form-group textarea {
+    min-height: 80px !important;
 }
 
 .pm-bom-detail-view .form-group input:focus,
