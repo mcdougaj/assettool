@@ -1876,19 +1876,19 @@ function updatePMBOMItemDetails(node) {
                 </div>
                 <div class="form-group">
                     <label>PM Code:</label>
-                    <input type="text" id="editPmCode" class="edit-input" value="${sanitizeInput(pm.code)}">
+                    <input type="text" id="editPmCode" value="${sanitizeInput(pm.code)}">
                 </div>
                 <div class="form-group">
                     <label>Description:</label>
-                    <textarea id="editPmDescription" class="edit-input" rows="3">${sanitizeInput(pm.description)}</textarea>
+                    <textarea id="editPmDescription" rows="3">${sanitizeInput(pm.description)}</textarea>
                 </div>
                 <div class="form-group">
                     <label>Frequency:</label>
-                    <input type="text" id="editPmFrequency" class="edit-input" value="${sanitizeInput(pm.frequency)}">
+                    <input type="text" id="editPmFrequency" value="${sanitizeInput(pm.frequency)}">
                 </div>
                 <div class="form-group">
                     <label>Type:</label>
-                    <input type="text" id="editPmType" class="edit-input" value="${sanitizeInput(pm.type)}">
+                    <input type="text" id="editPmType" value="${sanitizeInput(pm.type)}">
                 </div>
                 <div class="detail-field">
                     <label>Assigned to Asset:</label>
@@ -1920,19 +1920,19 @@ function updatePMBOMItemDetails(node) {
                 </div>
                 <div class="form-group">
                     <label>Part Number:</label>
-                    <input type="text" id="editBomPartNumber" class="edit-input" value="${sanitizeInput(bom.partNumber)}">
+                    <input type="text" id="editBomPartNumber" value="${sanitizeInput(bom.partNumber)}">
                 </div>
                 <div class="form-group">
                     <label>Description:</label>
-                    <textarea id="editBomDescription" class="edit-input" rows="3">${sanitizeInput(bom.description)}</textarea>
+                    <textarea id="editBomDescription" rows="3">${sanitizeInput(bom.description)}</textarea>
                 </div>
                 <div class="form-group">
                     <label>Quantity:</label>
-                    <input type="number" id="editBomQuantity" class="edit-input" value="${bom.quantity}" step="0.01">
+                    <input type="number" id="editBomQuantity" value="${bom.quantity}" step="0.01">
                 </div>
                 <div class="form-group">
                     <label>Unit:</label>
-                    <input type="text" id="editBomUnit" class="edit-input" value="${sanitizeInput(bom.unit)}">
+                    <input type="text" id="editBomUnit" value="${sanitizeInput(bom.unit)}">
                 </div>
                 <div class="detail-field">
                     <label>Assigned to Asset:</label>
