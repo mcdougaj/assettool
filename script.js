@@ -303,6 +303,105 @@ function analyzeHierarchyDepth() {
 // Make it available globally for debugging
 window.analyzeHierarchyDepth = analyzeHierarchyDepth;
 
+// Function to auto-generate missing parent-child relationships based on naming patterns
+function autoGenerateMissingHierarchyLevels() {
+    if (!excelData || !columnMappings.parent || !columnMappings.child) {
+        console.log('⚠️ No data loaded or columns not mapped');
+        return 0;
+    }
+
+    console.log('=== AUTO-GENERATING MISSING HIERARCHY LEVELS ===');
+
+    // Build a set of all children that exist in the data
+    const allChildren = new Set();
+    excelData.forEach(row => {
+        const childValue = row[columnMappings.child];
+        if (childValue) {
+            allChildren.add(childValue);
+        }
+    });
+
+    // Find all parents that never appear as children (potential missing relationships)
+    const missingRelationships = [];
+    const parentValues = new Set();
+
+    excelData.forEach(row => {
+        const parentValue = row[columnMappings.parent];
+        if (parentValue && !allChildren.has(parentValue)) {
+            parentValues.add(parentValue);
+        }
+    });
+
+    console.log(`📊 Found ${parentValues.size} parents that don't appear as children`);
+
+    // For each orphaned parent, try to infer its parent from the naming pattern
+    parentValues.forEach(orphanedParent => {
+        // Try to detect parent based on dash-separated hierarchy pattern
+        // e.g., "1020-238-320-20-1" -> parent should be "1020-238-320-20"
+        const segments = orphanedParent.split('-');
+
+        if (segments.length > 1) {
+            // Try removing the last segment to get potential parent
+            const potentialParent = segments.slice(0, -1).join('-');
+
+            // Check if this potential parent exists in the data
+            const parentExists = excelData.some(row =>
+                row[columnMappings.child] === potentialParent ||
+                row[columnMappings.parent] === potentialParent
+            );
+
+            if (parentExists) {
+                missingRelationships.push({
+                    parent: potentialParent,
+                    child: orphanedParent,
+                    inferred: true
+                });
+                console.log(`   ✅ Inferred: ${potentialParent} → ${orphanedParent}`);
+            }
+        }
+    });
+
+    if (missingRelationships.length === 0) {
+        console.log('✅ No missing relationships detected');
+        return 0;
+    }
+
+    console.log(`\n📝 Generated ${missingRelationships.length} missing parent-child relationships`);
+
+    // Ask user before adding
+    const message = `Found ${missingRelationships.length} missing hierarchy levels.\n\n` +
+                   `Example: ${missingRelationships[0].parent} → ${missingRelationships[0].child}\n\n` +
+                   `Add these relationships to fix the hierarchy?`;
+
+    showConfirmDialog('Auto-Generate Missing Levels', message).then(confirmed => {
+        if (confirmed) {
+            // Add the missing relationships to the data
+            historyStack.push(JSON.stringify(excelData)); // Save for undo
+
+            missingRelationships.forEach(rel => {
+                const newRow = {};
+                newRow[columnMappings.parent] = rel.parent;
+                newRow[columnMappings.child] = rel.child;
+                if (columnMappings.description) {
+                    newRow[columnMappings.description] = `(Auto-generated level)`;
+                }
+                excelData.push(newRow);
+            });
+
+            updateTreeView();
+            showToast(`Added ${missingRelationships.length} missing hierarchy levels`, 'success');
+            console.log(`✅ Added ${missingRelationships.length} relationships to fix hierarchy`);
+        } else {
+            console.log('❌ User cancelled auto-generation');
+        }
+    });
+
+    return missingRelationships.length;
+}
+
+// Make it available globally
+window.autoGenerateMissingHierarchyLevels = autoGenerateMissingHierarchyLevels;
+
 // Initialize sample PM and BOM data
 function initializeSampleData() {
     pmRecords = [
@@ -336,10 +435,15 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeOrphanSearch();
     initializePMManagement();
     initializeBOMManagement();
+    initializeAutoGenerateButton();
 });
 
 function initializeUndoButton() {
     document.getElementById('undoHierarchy').addEventListener('click', undoLastChange);
+}
+
+function initializeAutoGenerateButton() {
+    document.getElementById('autoGenerateHierarchy').addEventListener('click', autoGenerateMissingHierarchyLevels);
 }
 
 function undoLastChange() {

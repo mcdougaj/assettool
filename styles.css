@@ -781,6 +781,20 @@ button:hover {
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
+.warning-button {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+    color: white;
+    font-weight: 600;
+    border: 2px solid #ff5252;
+    box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
+}
+
+.warning-button:hover {
+    background: linear-gradient(135deg, #ff5252 0%, #ee4a5f 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
+}
+
 #leftPanel .undo-button {
     display: none;
 }
