@@ -776,6 +776,7 @@ function updateTreeView() {
     const processedNodes = new Set();
     const parentChildMap = new Map();
 
+    console.log('[Tree Build] === Building parent-child map ===');
     excelData.forEach(row => {
         const parentValue = row[columnMappings.parent];
         const childValue = row[columnMappings.child];
@@ -789,11 +790,25 @@ function updateTreeView() {
         }
     });
 
+    console.log(`[Tree Build] Total parent nodes with children: ${parentChildMap.size}`);
+    console.log('[Tree Build] Sample relationships:');
+    let count = 0;
+    for (const [parent, children] of parentChildMap) {
+        if (count < 5) {
+            console.log(`  ${parent} -> [${children.map(c => c.child).join(', ')}]`);
+            count++;
+        }
+    }
+
     function addNode(value, isParent = true, level = 0) {
-        if (processedNodes.has(value)) return null;
+        if (processedNodes.has(value)) {
+            console.log(`[Tree Build] Skipping ${value} - already processed`);
+            return null;
+        }
         if (!value) return null;
 
         processedNodes.add(value);
+        console.log(`[Tree Build] Level ${level}: Building node ${value}`);
 
         const icons = ['fas fa-folder', 'fas fa-folder-open', 'fas fa-toolbox'];
         const rowData = excelData.find(row => row[columnMappings.child] === value);
@@ -803,6 +818,8 @@ function updateTreeView() {
         // Get PM and BOM counts for this node
         const pmCount = assetPmAssignments[value] ? assetPmAssignments[value].length : 0;
         const bomCount = assetBomAssignments[value] ? assetBomAssignments[value].length : 0;
+
+        console.log(`[Tree Build]   - Parent data found: ${!!rowData}, Has children: ${parentChildMap.has(value)}, PM: ${pmCount}, BOM: ${bomCount}`);
 
         // Build node text with badges
         let nodeText = value;
@@ -824,7 +841,11 @@ function updateTreeView() {
 
         // Add regular child nodes first
         if (parentChildMap.has(value)) {
-            parentChildMap.get(value).forEach(({ child, description }) => {
+            const children = parentChildMap.get(value);
+            console.log(`[Tree Build]   - Adding ${children.length} asset children to ${value}`);
+
+            children.forEach(({ child, description }) => {
+                console.log(`[Tree Build]     -> Processing child: ${child}`);
                 const childNode = addNode(child, false, level + 1);
                 if (childNode) {
                     const childPmCount = assetPmAssignments[child] ? assetPmAssignments[child].length : 0;
@@ -841,6 +862,9 @@ function updateTreeView() {
                     childNode.text = childText;
                     node.children.push(childNode);
                     node.icon = icons[1]; // Change to open folder if it has children
+                    console.log(`[Tree Build]     -> Added child ${child} successfully`);
+                } else {
+                    console.log(`[Tree Build]     -> Child ${child} returned null (already processed)`);
                 }
             });
         }
@@ -906,13 +930,18 @@ function updateTreeView() {
         return node;
     }
 
+    console.log('[Tree Build] === Identifying root nodes ===');
     parentChildMap.forEach((_, parent) => {
         if (!processedNodes.has(parent)) {
+            console.log(`[Tree Build] Adding root node: ${parent}`);
             const node = addNode(parent);
             if (node) treeData.push(node);
+        } else {
+            console.log(`[Tree Build] Skipping ${parent} as root - already processed as child`);
         }
     });
 
+    console.log(`[Tree Build] === Tree build complete: ${treeData.length} root nodes ===`);
     lastTreeData = treeData;
     $('#treeView').jstree(true).settings.core.data = treeData;
     $('#treeView').jstree(true).refresh();
