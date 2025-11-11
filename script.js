@@ -1190,53 +1190,55 @@ function updateTreeView() {
 
     console.log('[Tree Build] === Identifying TRUE root nodes ===');
 
-    // Build set of all children
+    // Build sets of all children and all parents that have defined relationships
     const allChildren = new Set();
+    const allParentsWithRelationships = new Set();
+
     excelData.forEach(row => {
         const childValue = row[columnMappings.child];
+        const parentValue = row[columnMappings.parent];
+
         if (childValue) {
             allChildren.add(childValue);
         }
-    });
 
-    const trueRoots = [];
-
-    // Method 1: Find orphan records (children with no parent) that have children themselves
-    // These are the ACTUAL roots that users need to drag-and-drop to assign parents
-    excelData.forEach(row => {
-        const parentValue = row[columnMappings.parent];
-        const childValue = row[columnMappings.child];
-
-        // If this is an orphan (no parent) AND it has children, it's a root
-        if ((!parentValue || parentValue === '' || parentValue === null) && childValue) {
-            // Check if this orphan has children
-            if (parentChildMap.has(childValue)) {
-                if (!trueRoots.includes(childValue)) {
-                    trueRoots.push(childValue);
-                    console.log(`[Tree Build] ✅ Found orphan root (has children): ${childValue}`);
-                }
-            } else {
-                // Orphan with no children - still might be a leaf root
-                if (!trueRoots.includes(childValue)) {
-                    trueRoots.push(childValue);
-                    console.log(`[Tree Build] 📄 Found orphan leaf: ${childValue}`);
-                }
-            }
+        // Only count as a valid parent if the parent field is not empty
+        if (parentValue && parentValue !== '' && parentValue !== null) {
+            allParentsWithRelationships.add(parentValue);
         }
     });
 
-    // Method 2: Find parents that never appear as children (traditional roots)
+    console.log(`[Tree Build] Total unique children: ${allChildren.size}`);
+    console.log(`[Tree Build] Total unique parents with relationships: ${allParentsWithRelationships.size}`);
+
+    const trueRoots = [];
+
+    // Find TRUE roots: nodes that appear as parents but NEVER as children
+    // These are the top-level nodes where hierarchies start
     parentChildMap.forEach((_, parent) => {
         // A true root is a parent that never appears as anyone's child
         if (!allChildren.has(parent)) {
-            if (!trueRoots.includes(parent)) {
-                trueRoots.push(parent);
-                console.log(`[Tree Build] 🌳 Found traditional root: ${parent}`);
-            }
+            trueRoots.push(parent);
+            console.log(`[Tree Build] 🌳 Found root node: ${parent}`);
         }
     });
 
     console.log(`[Tree Build] Total true roots found: ${trueRoots.length}`);
+
+    // Count orphaned assets (assets with no parent defined)
+    let orphanCount = 0;
+    excelData.forEach(row => {
+        const parentValue = row[columnMappings.parent];
+        const childValue = row[columnMappings.child];
+        if (childValue && (!parentValue || parentValue === '' || parentValue === null)) {
+            orphanCount++;
+        }
+    });
+
+    if (orphanCount > 0) {
+        console.log(`[Tree Build] ⚠️ Found ${orphanCount} orphaned assets (no parent defined) - these are excluded from the tree`);
+        console.log(`[Tree Build] 💡 Use "Show Orphan Records" button to assign parents to orphaned assets`);
+    }
 
     // Build tree from true roots only
     trueRoots.forEach(rootValue => {
@@ -1249,11 +1251,17 @@ function updateTreeView() {
     console.log(`[Tree Build] === Tree build complete ===`);
     console.log(`[Tree Build] 📊 Statistics:`);
     console.log(`[Tree Build]    - Root nodes: ${treeData.length}`);
-    console.log(`[Tree Build]    - Total nodes processed: ${processedNodes.size}`);
+    console.log(`[Tree Build]    - Total nodes in tree: ${processedNodes.size}`);
+    console.log(`[Tree Build]    - Orphaned assets (excluded): ${orphanCount}`);
     console.log(`[Tree Build]    - Maximum depth reached: ${maxDepth} levels`);
     console.log(`[Tree Build]    - Total parent-child relationships: ${parentChildMap.size}`);
 
-    if (maxDepth < 3) {
+    if (maxDepth < 3 && orphanCount > 0) {
+        console.warn(`[Tree Build] ⚠️ WARNING: Maximum depth is only ${maxDepth} levels. Expected 6+ levels.`);
+        console.warn(`[Tree Build] 🔍 Likely cause: ${orphanCount} orphaned assets breaking the hierarchy chains`);
+        console.warn(`[Tree Build] 💡 Fix: Use "🔧 Fix Hierarchy Levels" button to auto-detect parents, or`);
+        console.warn(`[Tree Build]          Use "Show Orphan Records" to manually assign parents`);
+    } else if (maxDepth < 3) {
         console.warn(`[Tree Build] ⚠️ WARNING: Maximum depth is only ${maxDepth}. Expected 6+ levels.`);
         console.warn(`[Tree Build] 🔍 This may indicate:`);
         console.warn(`[Tree Build]    1. Data has fewer hierarchy levels than expected`);
