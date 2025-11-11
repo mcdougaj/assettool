@@ -1030,10 +1030,18 @@ function updateTreeView() {
     let maxDepth = 0; // Track maximum depth reached
 
     console.log('[Tree Build] === Building parent-child map ===');
-    excelData.forEach(row => {
+    console.log(`[Tree Build] Column mappings: Parent="${columnMappings.parent}", Child="${columnMappings.child}", Description="${columnMappings.description}"`);
+    console.log(`[Tree Build] Total rows in dataset: ${excelData.length}`);
+
+    excelData.forEach((row, index) => {
         const parentValue = row[columnMappings.parent];
         const childValue = row[columnMappings.child];
         const description = columnMappings.description ? row[columnMappings.description] : '';
+
+        // Debug first few rows
+        if (index < 5) {
+            console.log(`[Tree Build] Row ${index}: Child="${childValue}", Parent="${parentValue}", Desc="${description}"`);
+        }
 
         if (parentValue) {
             if (!parentChildMap.has(parentValue)) {
@@ -1044,18 +1052,19 @@ function updateTreeView() {
     });
 
     console.log(`[Tree Build] Total parent nodes with children: ${parentChildMap.size}`);
-    console.log('[Tree Build] Sample relationships:');
+    console.log('[Tree Build] Sample relationships (parent -> children):');
     let count = 0;
     for (const [parent, children] of parentChildMap) {
-        if (count < 5) {
-            console.log(`  ${parent} -> [${children.map(c => c.child).join(', ')}]`);
+        if (count < 10) {
+            const childList = children.map(c => c.child).join(', ');
+            console.log(`  "${parent}" -> [${childList}] (${children.length} children)`);
             count++;
         }
     }
 
     function addNode(value, isParent = true, level = 0) {
         if (processedNodes.has(value)) {
-            console.log(`[Tree Build] ${'  '.repeat(level)}⚠ Skipping ${value} - already processed`);
+            console.log(`[Tree Build] ${'  '.repeat(level)}⚠ Skipping "${value}" - already processed (prevents infinite loop)`);
             return null;
         }
         if (!value) return null;
@@ -1067,7 +1076,8 @@ function updateTreeView() {
             maxDepth = level;
         }
 
-        console.log(`[Tree Build] ${'  '.repeat(level)}📁 Level ${level}: Building node ${value}`);
+        const indent = '  '.repeat(level);
+        console.log(`${indent}[Depth ${level}] Processing node: "${value}"`);
 
         const icons = ['fas fa-folder', 'fas fa-folder-open', 'fas fa-toolbox'];
         const rowData = excelData.find(row => row[columnMappings.child] === value);
@@ -1101,7 +1111,8 @@ function updateTreeView() {
         // Add regular child nodes first
         if (parentChildMap.has(value)) {
             const children = parentChildMap.get(value);
-            console.log(`[Tree Build] ${'  '.repeat(level)}   ⬇ Processing ${children.length} asset children`);
+            const childList = children.map(c => c.child).join(', ');
+            console.log(`${indent}  ↳ Has ${children.length} children: [${childList}]`);
 
             children.forEach(({ child, description }) => {
                 const childNode = addNode(child, false, level + 1);
@@ -1120,11 +1131,10 @@ function updateTreeView() {
                     childNode.text = childText;
                     node.children.push(childNode);
                     node.icon = icons[1]; // Change to open folder if it has children
-                    console.log(`[Tree Build] ${'  '.repeat(level)}   ✅ Added child ${child}`);
-                } else {
-                    console.log(`[Tree Build] ${'  '.repeat(level)}   ⏭ Skipped ${child} (duplicate)`);
                 }
             });
+        } else {
+            console.log(`${indent}  ↳ Leaf node (no children)`);
         }
 
         // Add PM Tasks folder if there are PM assignments
@@ -1208,22 +1218,31 @@ function updateTreeView() {
         }
     });
 
-    console.log(`[Tree Build] Total unique children: ${allChildren.size}`);
-    console.log(`[Tree Build] Total unique parents with relationships: ${allParentsWithRelationships.size}`);
+    console.log(`[Tree Build] Total unique children in data: ${allChildren.size}`);
+    console.log(`[Tree Build] Total unique parents in data: ${allParentsWithRelationships.size}`);
+    console.log(`[Tree Build] Total parents with children: ${parentChildMap.size}`);
 
     const trueRoots = [];
 
     // Find TRUE roots: nodes that appear as parents but NEVER as children
     // These are the top-level nodes where hierarchies start
-    parentChildMap.forEach((_, parent) => {
+    console.log(`[Tree Build] Searching for roots (parents that never appear as children)...`);
+    parentChildMap.forEach((children, parent) => {
         // A true root is a parent that never appears as anyone's child
         if (!allChildren.has(parent)) {
             trueRoots.push(parent);
-            console.log(`[Tree Build] 🌳 Found root node: ${parent}`);
+            console.log(`[Tree Build] 🌳 ROOT FOUND: "${parent}" (has ${children.length} direct children)`);
         }
     });
 
-    console.log(`[Tree Build] Total true roots found: ${trueRoots.length}`);
+    console.log(`[Tree Build] === Total true roots found: ${trueRoots.length} ===`);
+    if (trueRoots.length === 0) {
+        console.error(`[Tree Build] ❌ ERROR: No root nodes found! This will result in an empty tree.`);
+        console.error(`[Tree Build] 🔍 Possible causes:`);
+        console.error(`[Tree Build]    1. All nodes appear as both parent AND child (circular reference)`);
+        console.error(`[Tree Build]    2. Column mappings are incorrect`);
+        console.error(`[Tree Build]    3. Data format is unexpected`);
+    }
 
     // Count orphaned assets (assets with no parent defined)
     let orphanCount = 0;
