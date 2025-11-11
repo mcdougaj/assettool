@@ -315,8 +315,8 @@ function autoGenerateMissingHierarchyLevels() {
     // Build a set of all valid parent/child values that exist in the data
     const allAssetIds = new Set();
     excelData.forEach(row => {
-        const childValue = row[columnMappings.child];
-        const parentValue = row[columnMappings.parent];
+        const childValue = normalizeAssetId(row[columnMappings.child]);
+        const parentValue = normalizeAssetId(row[columnMappings.parent]);
         if (childValue) allAssetIds.add(childValue);
         if (parentValue) allAssetIds.add(parentValue);
     });
@@ -326,11 +326,11 @@ function autoGenerateMissingHierarchyLevels() {
     // Find children with empty parent values (orphans)
     const orphanedChildren = [];
     excelData.forEach((row, index) => {
-        const childValue = row[columnMappings.child];
-        const parentValue = row[columnMappings.parent];
+        const childValue = normalizeAssetId(row[columnMappings.child]);
+        const parentValue = normalizeAssetId(row[columnMappings.parent]);
 
         // If this child has no parent defined, it's an orphan
-        if (childValue && (!parentValue || parentValue === '' || parentValue === null)) {
+        if (childValue && !parentValue) {
             orphanedChildren.push({ row, index, childValue });
         }
     });
@@ -1018,6 +1018,23 @@ function cancelChanges() {
     updateEditForm(selectedNode);
 }
 
+// Helper function to normalize asset IDs by removing invisible Unicode and trimming
+function normalizeAssetId(value) {
+    if (!value) return null;
+    if (typeof value !== 'string') value = String(value);
+
+    // Remove invisible Unicode characters (LTR/RTL marks, zero-width chars, etc.)
+    // \u200B-\u200F: zero-width spaces and directional marks
+    // \u202A-\u202E: embedding and override marks
+    // \uFEFF: zero-width no-break space
+    value = value.replace(/[\u200B-\u200F\u202A-\u202E\uFEFF]/g, '');
+
+    // Trim whitespace
+    value = value.trim();
+
+    return value || null;
+}
+
 function updateTreeView() {
     if (!excelData || !columnMappings.parent || !columnMappings.child) return;
 
@@ -1034,8 +1051,9 @@ function updateTreeView() {
     console.log(`[Tree Build] Total rows in dataset: ${excelData.length}`);
 
     excelData.forEach((row, index) => {
-        const parentValue = row[columnMappings.parent];
-        const childValue = row[columnMappings.child];
+        // NORMALIZE parent and child values to remove invisible Unicode
+        const parentValue = normalizeAssetId(row[columnMappings.parent]);
+        const childValue = normalizeAssetId(row[columnMappings.child]);
         const description = columnMappings.description ? row[columnMappings.description] : '';
 
         // Debug first few rows
@@ -1080,7 +1098,7 @@ function updateTreeView() {
         console.log(`${indent}[Depth ${level}] Processing node: "${value}"`);
 
         const icons = ['fas fa-folder', 'fas fa-folder-open', 'fas fa-toolbox'];
-        const rowData = excelData.find(row => row[columnMappings.child] === value);
+        const rowData = excelData.find(row => normalizeAssetId(row[columnMappings.child]) === value);
         const familyPath = rowData ? rowData['Family Path'] : 'N/A';
         const parentChild = rowData ? rowData['Parent-Child(s)'] : 'N/A';
 
@@ -1205,15 +1223,16 @@ function updateTreeView() {
     const allParentsWithRelationships = new Set();
 
     excelData.forEach(row => {
-        const childValue = row[columnMappings.child];
-        const parentValue = row[columnMappings.parent];
+        // NORMALIZE before adding to sets
+        const childValue = normalizeAssetId(row[columnMappings.child]);
+        const parentValue = normalizeAssetId(row[columnMappings.parent]);
 
         if (childValue) {
             allChildren.add(childValue);
         }
 
         // Only count as a valid parent if the parent field is not empty
-        if (parentValue && parentValue !== '' && parentValue !== null) {
+        if (parentValue) {
             allParentsWithRelationships.add(parentValue);
         }
     });
@@ -1247,9 +1266,9 @@ function updateTreeView() {
     // Count orphaned assets (assets with no parent defined)
     let orphanCount = 0;
     excelData.forEach(row => {
-        const parentValue = row[columnMappings.parent];
-        const childValue = row[columnMappings.child];
-        if (childValue && (!parentValue || parentValue === '' || parentValue === null)) {
+        const parentValue = normalizeAssetId(row[columnMappings.parent]);
+        const childValue = normalizeAssetId(row[columnMappings.child]);
+        if (childValue && !parentValue) {
             orphanCount++;
         }
     });
