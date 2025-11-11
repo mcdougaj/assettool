@@ -312,91 +312,106 @@ function autoGenerateMissingHierarchyLevels() {
 
     console.log('=== AUTO-GENERATING MISSING HIERARCHY LEVELS ===');
 
-    // Build a set of all children that exist in the data
-    const allChildren = new Set();
+    // Build a set of all valid parent/child values that exist in the data
+    const allAssetIds = new Set();
     excelData.forEach(row => {
         const childValue = row[columnMappings.child];
-        if (childValue) {
-            allChildren.add(childValue);
-        }
-    });
-
-    // Find all parents that never appear as children (potential missing relationships)
-    const missingRelationships = [];
-    const parentValues = new Set();
-
-    excelData.forEach(row => {
         const parentValue = row[columnMappings.parent];
-        if (parentValue && !allChildren.has(parentValue)) {
-            parentValues.add(parentValue);
+        if (childValue) allAssetIds.add(childValue);
+        if (parentValue) allAssetIds.add(parentValue);
+    });
+
+    console.log(`📊 Found ${allAssetIds.size} unique asset IDs in the dataset`);
+
+    // Find children with empty parent values (orphans)
+    const orphanedChildren = [];
+    excelData.forEach((row, index) => {
+        const childValue = row[columnMappings.child];
+        const parentValue = row[columnMappings.parent];
+
+        // If this child has no parent defined, it's an orphan
+        if (childValue && (!parentValue || parentValue === '' || parentValue === null)) {
+            orphanedChildren.push({ row, index, childValue });
         }
     });
 
-    console.log(`📊 Found ${parentValues.size} parents that don't appear as children`);
+    console.log(`📊 Found ${orphanedChildren.length} orphaned children (assets with no parent)`);
 
-    // For each orphaned parent, try to infer its parent from the naming pattern
-    parentValues.forEach(orphanedParent => {
-        // Try to detect parent based on dash-separated hierarchy pattern
+    if (orphanedChildren.length === 0) {
+        console.log('✅ No orphaned children found - all assets have parents!');
+        return 0;
+    }
+
+    // Try to infer parents for orphaned children
+    const inferredRelationships = [];
+
+    orphanedChildren.forEach(({ row, index, childValue }) => {
+        // Try dash-separated hierarchy pattern
         // e.g., "1020-238-320-20-1" -> parent should be "1020-238-320-20"
-        const segments = orphanedParent.split('-');
+        const segments = childValue.split('-');
 
         if (segments.length > 1) {
             // Try removing the last segment to get potential parent
             const potentialParent = segments.slice(0, -1).join('-');
 
             // Check if this potential parent exists in the data
-            const parentExists = excelData.some(row =>
-                row[columnMappings.child] === potentialParent ||
-                row[columnMappings.parent] === potentialParent
-            );
-
-            if (parentExists) {
-                missingRelationships.push({
-                    parent: potentialParent,
-                    child: orphanedParent,
-                    inferred: true
+            if (allAssetIds.has(potentialParent)) {
+                inferredRelationships.push({
+                    rowIndex: index,
+                    child: childValue,
+                    inferredParent: potentialParent
                 });
-                console.log(`   ✅ Inferred: ${potentialParent} → ${orphanedParent}`);
+                console.log(`   ✅ Inferred: ${childValue} → ${potentialParent}`);
             }
         }
     });
 
-    if (missingRelationships.length === 0) {
-        console.log('✅ No missing relationships detected');
+    if (inferredRelationships.length === 0) {
+        console.log(`⚠️ Could not infer parents for any of the ${orphanedChildren.length} orphaned children`);
+        console.log('   Pattern matching only works for dash-separated hierarchies (e.g., "1020-238-1")');
+        console.log(`   Please use "Show Orphan Records" to manually assign parents`);
+
+        showToast(`Found ${orphanedChildren.length} orphans, but automatic parent detection failed. Use "Show Orphan Records" to assign parents manually.`, 'warning', 5000);
         return 0;
     }
 
-    console.log(`\n📝 Generated ${missingRelationships.length} missing parent-child relationships`);
+    console.log(`\n📝 Successfully inferred ${inferredRelationships.length} parent relationships (${orphanedChildren.length - inferredRelationships.length} could not be inferred)`);
 
-    // Ask user before adding
-    const message = `Found ${missingRelationships.length} missing hierarchy levels.\n\n` +
-                   `Example: ${missingRelationships[0].parent} → ${missingRelationships[0].child}\n\n` +
-                   `Add these relationships to fix the hierarchy?`;
+    // Ask user before updating
+    const message = `Found ${orphanedChildren.length} orphaned assets.\n\n` +
+                   `Can auto-detect parents for ${inferredRelationships.length} of them using naming patterns.\n\n` +
+                   `Example: "${inferredRelationships[0].child}" → parent: "${inferredRelationships[0].inferredParent}"\n\n` +
+                   `Update these ${inferredRelationships.length} orphaned assets with their detected parents?`;
 
-    showConfirmDialog('Auto-Generate Missing Levels', message).then(confirmed => {
+    showConfirmDialog('Fix Orphaned Assets', message).then(confirmed => {
         if (confirmed) {
-            // Add the missing relationships to the data
+            // Update the parent values for the orphaned children
             historyStack.push(JSON.stringify(excelData)); // Save for undo
 
-            missingRelationships.forEach(rel => {
-                const newRow = {};
-                newRow[columnMappings.parent] = rel.parent;
-                newRow[columnMappings.child] = rel.child;
-                if (columnMappings.description) {
-                    newRow[columnMappings.description] = `(Auto-generated level)`;
-                }
-                excelData.push(newRow);
+            inferredRelationships.forEach(rel => {
+                excelData[rel.rowIndex][columnMappings.parent] = rel.inferredParent;
             });
 
             updateTreeView();
-            showToast(`Added ${missingRelationships.length} missing hierarchy levels`, 'success');
-            console.log(`✅ Added ${missingRelationships.length} relationships to fix hierarchy`);
+
+            const remaining = orphanedChildren.length - inferredRelationships.length;
+            let message = `Fixed ${inferredRelationships.length} orphaned assets`;
+            if (remaining > 0) {
+                message += `. ${remaining} orphans remain (use "Show Orphan Records" to fix manually)`;
+            }
+
+            showToast(message, 'success', 5000);
+            console.log(`✅ Updated ${inferredRelationships.length} parent relationships`);
+
+            if (remaining > 0) {
+                console.log(`⚠️ ${remaining} orphans could not be auto-fixed - manual assignment needed`);
+            }
         } else {
             console.log('❌ User cancelled auto-generation');
         }
     });
 
-    return missingRelationships.length;
+    return inferredRelationships.length;
 }
 
 // Make it available globally
