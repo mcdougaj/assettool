@@ -170,6 +170,139 @@ function getAllAssetNodes() {
     return allNodes.filter(node => node.id !== '#');
 }
 
+// Diagnostic function to analyze hierarchy depth
+function analyzeHierarchyDepth() {
+    if (!excelData || !columnMappings.parent || !columnMappings.child) {
+        console.log('⚠️ No data loaded or columns not mapped');
+        return;
+    }
+
+    console.log('=== HIERARCHY DEPTH ANALYSIS ===');
+
+    // Build parent-child map
+    const childToParent = new Map();
+    const parentToChildren = new Map();
+
+    excelData.forEach(row => {
+        const parent = row[columnMappings.parent];
+        const child = row[columnMappings.child];
+
+        if (child) {
+            childToParent.set(child, parent);
+        }
+
+        if (parent) {
+            if (!parentToChildren.has(parent)) {
+                parentToChildren.set(parent, []);
+            }
+            parentToChildren.get(parent).push(child);
+        }
+    });
+
+    // Find all unique nodes
+    const allNodes = new Set();
+    excelData.forEach(row => {
+        if (row[columnMappings.parent]) allNodes.add(row[columnMappings.parent]);
+        if (row[columnMappings.child]) allNodes.add(row[columnMappings.child]);
+    });
+
+    console.log(`📊 Total unique nodes: ${allNodes.size}`);
+    console.log(`📊 Nodes with children: ${parentToChildren.size}`);
+
+    // Calculate depth for each node
+    function getDepth(node, visited = new Set()) {
+        if (visited.has(node)) {
+            console.warn(`⚠️ Circular reference detected: ${node}`);
+            return 0;
+        }
+
+        visited.add(node);
+        const parent = childToParent.get(node);
+
+        if (!parent || parent === '') {
+            return 0; // Root node
+        }
+
+        return 1 + getDepth(parent, visited);
+    }
+
+    // Find nodes at each depth level
+    const depthMap = new Map();
+    let maxDepthFound = 0;
+
+    allNodes.forEach(node => {
+        const depth = getDepth(node);
+        if (depth > maxDepthFound) maxDepthFound = depth;
+
+        if (!depthMap.has(depth)) {
+            depthMap.set(depth, []);
+        }
+        depthMap.get(depth).push(node);
+    });
+
+    console.log(`\n📏 Hierarchy Depth Distribution:`);
+    for (let i = 0; i <= maxDepthFound; i++) {
+        const nodesAtDepth = depthMap.get(i) || [];
+        console.log(`   Level ${i}: ${nodesAtDepth.length} nodes`);
+        if (nodesAtDepth.length <= 5) {
+            nodesAtDepth.forEach(n => console.log(`      - ${n}`));
+        } else {
+            console.log(`      - ${nodesAtDepth.slice(0, 3).join(', ')}... (and ${nodesAtDepth.length - 3} more)`);
+        }
+    }
+
+    console.log(`\n✅ Maximum hierarchy depth: ${maxDepthFound} levels`);
+
+    // Check for duplicate parent-child pairs
+    const pairSet = new Set();
+    const duplicates = [];
+    excelData.forEach(row => {
+        const parent = row[columnMappings.parent];
+        const child = row[columnMappings.child];
+        const pair = `${parent}|${child}`;
+
+        if (pairSet.has(pair)) {
+            duplicates.push(pair);
+        }
+        pairSet.add(pair);
+    });
+
+    if (duplicates.length > 0) {
+        console.warn(`\n⚠️ Found ${duplicates.length} duplicate parent-child pairs:`);
+        duplicates.slice(0, 5).forEach(pair => console.warn(`   - ${pair.replace('|', ' → ')}`));
+        if (duplicates.length > 5) {
+            console.warn(`   ... and ${duplicates.length - 5} more`);
+        }
+    }
+
+    // Show sample deep hierarchy path
+    const deepestNodes = depthMap.get(maxDepthFound) || [];
+    if (deepestNodes.length > 0) {
+        const sampleNode = deepestNodes[0];
+        console.log(`\n🔍 Sample path to deepest node (${sampleNode}):`);
+
+        let current = sampleNode;
+        const path = [];
+        const visited = new Set();
+
+        while (current && !visited.has(current)) {
+            visited.add(current);
+            path.unshift(current);
+            current = childToParent.get(current);
+        }
+
+        path.forEach((node, idx) => {
+            const children = parentToChildren.get(node) || [];
+            console.log(`${'  '.repeat(idx)}Level ${idx}: ${node} (${children.length} children)`);
+        });
+    }
+
+    console.log('\n=== END ANALYSIS ===\n');
+}
+
+// Make it available globally for debugging
+window.analyzeHierarchyDepth = analyzeHierarchyDepth;
+
 // Initialize sample PM and BOM data
 function initializeSampleData() {
     pmRecords = [
@@ -775,6 +908,7 @@ function updateTreeView() {
     const treeData = [];
     const processedNodes = new Set();
     const parentChildMap = new Map();
+    let maxDepth = 0; // Track maximum depth reached
 
     console.log('[Tree Build] === Building parent-child map ===');
     excelData.forEach(row => {
@@ -802,13 +936,19 @@ function updateTreeView() {
 
     function addNode(value, isParent = true, level = 0) {
         if (processedNodes.has(value)) {
-            console.log(`[Tree Build] Skipping ${value} - already processed`);
+            console.log(`[Tree Build] ${'  '.repeat(level)}⚠ Skipping ${value} - already processed`);
             return null;
         }
         if (!value) return null;
 
         processedNodes.add(value);
-        console.log(`[Tree Build] Level ${level}: Building node ${value}`);
+
+        // Track maximum depth
+        if (level > maxDepth) {
+            maxDepth = level;
+        }
+
+        console.log(`[Tree Build] ${'  '.repeat(level)}📁 Level ${level}: Building node ${value}`);
 
         const icons = ['fas fa-folder', 'fas fa-folder-open', 'fas fa-toolbox'];
         const rowData = excelData.find(row => row[columnMappings.child] === value);
@@ -819,7 +959,7 @@ function updateTreeView() {
         const pmCount = assetPmAssignments[value] ? assetPmAssignments[value].length : 0;
         const bomCount = assetBomAssignments[value] ? assetBomAssignments[value].length : 0;
 
-        console.log(`[Tree Build]   - Parent data found: ${!!rowData}, Has children: ${parentChildMap.has(value)}, PM: ${pmCount}, BOM: ${bomCount}`);
+        console.log(`[Tree Build] ${'  '.repeat(level)}   ℹ Data: ${!!rowData}, Children: ${parentChildMap.has(value) ? parentChildMap.get(value).length : 0}, PM: ${pmCount}, BOM: ${bomCount}`);
 
         // Build node text with badges
         let nodeText = value;
@@ -842,10 +982,9 @@ function updateTreeView() {
         // Add regular child nodes first
         if (parentChildMap.has(value)) {
             const children = parentChildMap.get(value);
-            console.log(`[Tree Build]   - Adding ${children.length} asset children to ${value}`);
+            console.log(`[Tree Build] ${'  '.repeat(level)}   ⬇ Processing ${children.length} asset children`);
 
             children.forEach(({ child, description }) => {
-                console.log(`[Tree Build]     -> Processing child: ${child}`);
                 const childNode = addNode(child, false, level + 1);
                 if (childNode) {
                     const childPmCount = assetPmAssignments[child] ? assetPmAssignments[child].length : 0;
@@ -862,9 +1001,9 @@ function updateTreeView() {
                     childNode.text = childText;
                     node.children.push(childNode);
                     node.icon = icons[1]; // Change to open folder if it has children
-                    console.log(`[Tree Build]     -> Added child ${child} successfully`);
+                    console.log(`[Tree Build] ${'  '.repeat(level)}   ✅ Added child ${child}`);
                 } else {
-                    console.log(`[Tree Build]     -> Child ${child} returned null (already processed)`);
+                    console.log(`[Tree Build] ${'  '.repeat(level)}   ⏭ Skipped ${child} (duplicate)`);
                 }
             });
         }
@@ -976,7 +1115,21 @@ function updateTreeView() {
         }
     });
 
-    console.log(`[Tree Build] === Tree build complete: ${treeData.length} root nodes added ===`);
+    console.log(`[Tree Build] === Tree build complete ===`);
+    console.log(`[Tree Build] 📊 Statistics:`);
+    console.log(`[Tree Build]    - Root nodes: ${treeData.length}`);
+    console.log(`[Tree Build]    - Total nodes processed: ${processedNodes.size}`);
+    console.log(`[Tree Build]    - Maximum depth reached: ${maxDepth} levels`);
+    console.log(`[Tree Build]    - Total parent-child relationships: ${parentChildMap.size}`);
+
+    if (maxDepth < 3) {
+        console.warn(`[Tree Build] ⚠️ WARNING: Maximum depth is only ${maxDepth}. Expected 6+ levels.`);
+        console.warn(`[Tree Build] 🔍 This may indicate:`);
+        console.warn(`[Tree Build]    1. Data has fewer hierarchy levels than expected`);
+        console.warn(`[Tree Build]    2. Duplicate parent-child entries causing early termination`);
+        console.warn(`[Tree Build]    3. Circular references in the data`);
+    }
+
     lastTreeData = treeData;
     $('#treeView').jstree(true).settings.core.data = treeData;
     $('#treeView').jstree(true).refresh();
