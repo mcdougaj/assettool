@@ -1175,7 +1175,7 @@ function updateTreeView() {
 
     console.log('[Tree Build] === Identifying TRUE root nodes ===');
 
-    // Identify true root nodes: nodes that appear as parents but NEVER as children
+    // Build set of all children
     const allChildren = new Set();
     excelData.forEach(row => {
         const childValue = row[columnMappings.child];
@@ -1185,26 +1185,38 @@ function updateTreeView() {
     });
 
     const trueRoots = [];
-    parentChildMap.forEach((_, parent) => {
-        // A true root is a parent that never appears as anyone's child
-        if (!allChildren.has(parent)) {
-            trueRoots.push(parent);
-            console.log(`[Tree Build] Found true root: ${parent}`);
-        }
-    });
 
-    // Also check for nodes that are children but whose parents don't exist in the data
-    // These are orphaned subtrees that should also be roots
+    // Method 1: Find orphan records (children with no parent) that have children themselves
+    // These are the ACTUAL roots that users need to drag-and-drop to assign parents
     excelData.forEach(row => {
         const parentValue = row[columnMappings.parent];
         const childValue = row[columnMappings.child];
 
-        // If this row has a parent value that doesn't appear as any child in the data,
-        // it might be a root of a subtree
-        if (parentValue && !allChildren.has(parentValue) && !trueRoots.includes(parentValue)) {
-            if (parentChildMap.has(parentValue)) {
-                trueRoots.push(parentValue);
-                console.log(`[Tree Build] Found orphaned parent as root: ${parentValue}`);
+        // If this is an orphan (no parent) AND it has children, it's a root
+        if ((!parentValue || parentValue === '' || parentValue === null) && childValue) {
+            // Check if this orphan has children
+            if (parentChildMap.has(childValue)) {
+                if (!trueRoots.includes(childValue)) {
+                    trueRoots.push(childValue);
+                    console.log(`[Tree Build] ✅ Found orphan root (has children): ${childValue}`);
+                }
+            } else {
+                // Orphan with no children - still might be a leaf root
+                if (!trueRoots.includes(childValue)) {
+                    trueRoots.push(childValue);
+                    console.log(`[Tree Build] 📄 Found orphan leaf: ${childValue}`);
+                }
+            }
+        }
+    });
+
+    // Method 2: Find parents that never appear as children (traditional roots)
+    parentChildMap.forEach((_, parent) => {
+        // A true root is a parent that never appears as anyone's child
+        if (!allChildren.has(parent)) {
+            if (!trueRoots.includes(parent)) {
+                trueRoots.push(parent);
+                console.log(`[Tree Build] 🌳 Found traditional root: ${parent}`);
             }
         }
     });
