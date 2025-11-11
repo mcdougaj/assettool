@@ -930,18 +930,53 @@ function updateTreeView() {
         return node;
     }
 
-    console.log('[Tree Build] === Identifying root nodes ===');
-    parentChildMap.forEach((_, parent) => {
-        if (!processedNodes.has(parent)) {
-            console.log(`[Tree Build] Adding root node: ${parent}`);
-            const node = addNode(parent);
-            if (node) treeData.push(node);
-        } else {
-            console.log(`[Tree Build] Skipping ${parent} as root - already processed as child`);
+    console.log('[Tree Build] === Identifying TRUE root nodes ===');
+
+    // Identify true root nodes: nodes that appear as parents but NEVER as children
+    const allChildren = new Set();
+    excelData.forEach(row => {
+        const childValue = row[columnMappings.child];
+        if (childValue) {
+            allChildren.add(childValue);
         }
     });
 
-    console.log(`[Tree Build] === Tree build complete: ${treeData.length} root nodes ===`);
+    const trueRoots = [];
+    parentChildMap.forEach((_, parent) => {
+        // A true root is a parent that never appears as anyone's child
+        if (!allChildren.has(parent)) {
+            trueRoots.push(parent);
+            console.log(`[Tree Build] Found true root: ${parent}`);
+        }
+    });
+
+    // Also check for nodes that are children but whose parents don't exist in the data
+    // These are orphaned subtrees that should also be roots
+    excelData.forEach(row => {
+        const parentValue = row[columnMappings.parent];
+        const childValue = row[columnMappings.child];
+
+        // If this row has a parent value that doesn't appear as any child in the data,
+        // it might be a root of a subtree
+        if (parentValue && !allChildren.has(parentValue) && !trueRoots.includes(parentValue)) {
+            if (parentChildMap.has(parentValue)) {
+                trueRoots.push(parentValue);
+                console.log(`[Tree Build] Found orphaned parent as root: ${parentValue}`);
+            }
+        }
+    });
+
+    console.log(`[Tree Build] Total true roots found: ${trueRoots.length}`);
+
+    // Build tree from true roots only
+    trueRoots.forEach(rootValue => {
+        const node = addNode(rootValue);
+        if (node) {
+            treeData.push(node);
+        }
+    });
+
+    console.log(`[Tree Build] === Tree build complete: ${treeData.length} root nodes added ===`);
     lastTreeData = treeData;
     $('#treeView').jstree(true).settings.core.data = treeData;
     $('#treeView').jstree(true).refresh();
