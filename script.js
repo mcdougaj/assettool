@@ -19,6 +19,11 @@ let assetBomAssignments = {}; // Maps asset IDs to BOM records
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const TOAST_DURATION = 4000; // 4 seconds
 
+// Debug flag - toggle verbose logging (enable with window.DEBUG = true in console)
+window.DEBUG = window.DEBUG || false;
+const debugLog = (...args) => { if (window.DEBUG) console.log(...args); };
+const debugWarn = (...args) => { if (window.DEBUG) console.warn(...args); };
+
 // Utility Functions
 function sanitizeInput(input) {
     if (typeof input !== 'string') return input;
@@ -451,7 +456,109 @@ document.addEventListener('DOMContentLoaded', function() {
     initializePMManagement();
     initializeBOMManagement();
     initializeAutoGenerateButton();
+    initializeKeyboardShortcuts();
 });
+
+function initializeKeyboardShortcuts() {
+    document.addEventListener('keydown', function(e) {
+        // Skip if user is typing in an input/textarea
+        const tag = e.target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return;
+
+        // Ctrl/Cmd + Z: Undo
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+            e.preventDefault();
+            const undoBtn = document.getElementById('undoHierarchy');
+            if (undoBtn) undoBtn.click();
+            return;
+        }
+
+        // Ctrl/Cmd + F: Focus search
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) searchInput.focus();
+            return;
+        }
+
+        // Ctrl/Cmd + S: Export/Save
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            const saveBtn = document.getElementById('saveChanges');
+            if (saveBtn) saveBtn.click();
+            return;
+        }
+
+        // Escape: Close modals
+        if (e.key === 'Escape') {
+            const openModals = document.querySelectorAll('.modal[style*="display: flex"], .modal[style*="display: block"]');
+            openModals.forEach(modal => {
+                const closeBtn = modal.querySelector('.close-button, .modal-close, [data-close]');
+                if (closeBtn) closeBtn.click();
+                else modal.style.display = 'none';
+            });
+            return;
+        }
+
+        // ? : Show keyboard shortcut help
+        if (e.key === '?' && e.shiftKey) {
+            e.preventDefault();
+            showKeyboardShortcutsHelp();
+            return;
+        }
+    });
+}
+
+function showKeyboardShortcutsHelp() {
+    const shortcuts = [
+        { keys: 'Ctrl/Cmd + Z', action: 'Undo last change' },
+        { keys: 'Ctrl/Cmd + F', action: 'Focus search box' },
+        { keys: 'Ctrl/Cmd + S', action: 'Export to Excel' },
+        { keys: 'Esc', action: 'Close modal' },
+        { keys: 'Shift + ?', action: 'Show this help' },
+        { keys: 'Arrow Keys', action: 'Navigate tree (when focused)' },
+        { keys: 'Enter/Space', action: 'Select tree node' }
+    ];
+
+    const content = shortcuts.map(s =>
+        `<tr><td style="padding:6px 12px;font-family:monospace;font-weight:bold;">${sanitizeInput(s.keys)}</td><td style="padding:6px 12px;">${sanitizeInput(s.action)}</td></tr>`
+    ).join('');
+
+    const html = `
+        <div style="padding: 16px;">
+            <h3 style="margin-top:0;">Keyboard Shortcuts</h3>
+            <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                    <tr style="background:#f1f3f5;"><th style="padding:6px 12px;text-align:left;">Key</th><th style="padding:6px 12px;text-align:left;">Action</th></tr>
+                </thead>
+                <tbody>${content}</tbody>
+            </table>
+        </div>`;
+
+    showInfoModal('Keyboard Shortcuts', html);
+}
+
+function showInfoModal(title, html) {
+    const existingModal = document.getElementById('infoModalDynamic');
+    if (existingModal) existingModal.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'infoModalDynamic';
+    modal.className = 'modal';
+    modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;align-items:center;justify-content:center;';
+    modal.innerHTML = `
+        <div style="background:white;border-radius:8px;max-width:500px;width:90%;max-height:80vh;overflow:auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #dee2e6;">
+                <strong>${sanitizeInput(title)}</strong>
+                <button id="closeInfoModal" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
+            </div>
+            <div>${html}</div>
+        </div>`;
+
+    document.body.appendChild(modal);
+    document.getElementById('closeInfoModal').addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+}
 
 function initializeUndoButton() {
     document.getElementById('undoHierarchy').addEventListener('click', undoLastChange);
@@ -1018,10 +1125,18 @@ function cancelChanges() {
     updateEditForm(selectedNode);
 }
 
+// Track Unicode normalization stats to report to user
+window.unicodeNormalizationStats = {
+    totalStripped: 0,
+    affectedValues: new Set()
+};
+
 // Helper function to normalize asset IDs by removing invisible Unicode and trimming
 function normalizeAssetId(value) {
     if (!value) return null;
     if (typeof value !== 'string') value = String(value);
+
+    const original = value;
 
     // Remove invisible Unicode characters (LTR/RTL marks, zero-width chars, etc.)
     // \u200B-\u200F: zero-width spaces and directional marks
@@ -1032,11 +1147,30 @@ function normalizeAssetId(value) {
     // Trim whitespace
     value = value.trim();
 
+    // Track if normalization changed the value
+    if (original !== value && original.length > 0) {
+        window.unicodeNormalizationStats.totalStripped++;
+        if (window.unicodeNormalizationStats.affectedValues.size < 100) {
+            window.unicodeNormalizationStats.affectedValues.add(value);
+        }
+    }
+
     return value || null;
+}
+
+// Reset normalization stats (call at start of each tree build)
+function resetNormalizationStats() {
+    window.unicodeNormalizationStats = {
+        totalStripped: 0,
+        affectedValues: new Set()
+    };
 }
 
 function updateTreeView() {
     if (!excelData || !columnMappings.parent || !columnMappings.child) return;
+
+    const startTime = performance.now();
+    resetNormalizationStats();
 
     // Update summaries before building tree
     updateSummaries();
@@ -1044,11 +1178,13 @@ function updateTreeView() {
     const treeData = [];
     const processedNodes = new Set();
     const parentChildMap = new Map();
+    // PERFORMANCE: Index row data by normalized child ID for O(1) lookup instead of O(n) find()
+    const rowDataIndex = new Map();
     let maxDepth = 0; // Track maximum depth reached
 
-    console.log('[Tree Build] === Building parent-child map ===');
-    console.log(`[Tree Build] Column mappings: Parent="${columnMappings.parent}", Child="${columnMappings.child}", Description="${columnMappings.description}"`);
-    console.log(`[Tree Build] Total rows in dataset: ${excelData.length}`);
+    debugLog('[Tree Build] === Building parent-child map ===');
+    debugLog(`[Tree Build] Column mappings: Parent="${columnMappings.parent}", Child="${columnMappings.child}", Description="${columnMappings.description}"`);
+    debugLog(`[Tree Build] Total rows in dataset: ${excelData.length}`);
 
     excelData.forEach((row, index) => {
         // NORMALIZE parent and child values to remove invisible Unicode
@@ -1056,9 +1192,14 @@ function updateTreeView() {
         const childValue = normalizeAssetId(row[columnMappings.child]);
         const description = columnMappings.description ? row[columnMappings.description] : '';
 
+        // Build index for O(1) row lookup by child ID
+        if (childValue) {
+            rowDataIndex.set(childValue, row);
+        }
+
         // Debug first few rows
         if (index < 5) {
-            console.log(`[Tree Build] Row ${index}: Child="${childValue}", Parent="${parentValue}", Desc="${description}"`);
+            debugLog(`[Tree Build] Row ${index}: Child="${childValue}", Parent="${parentValue}", Desc="${description}"`);
         }
 
         if (parentValue) {
@@ -1069,20 +1210,20 @@ function updateTreeView() {
         }
     });
 
-    console.log(`[Tree Build] Total parent nodes with children: ${parentChildMap.size}`);
-    console.log('[Tree Build] Sample relationships (parent -> children):');
+    debugLog(`[Tree Build] Total parent nodes with children: ${parentChildMap.size}`);
+    debugLog('[Tree Build] Sample relationships (parent -> children):');
     let count = 0;
     for (const [parent, children] of parentChildMap) {
         if (count < 10) {
             const childList = children.map(c => c.child).join(', ');
-            console.log(`  "${parent}" -> [${childList}] (${children.length} children)`);
+            debugLog(`  "${parent}" -> [${childList}] (${children.length} children)`);
             count++;
         }
     }
 
     function addNode(value, isParent = true, level = 0) {
         if (processedNodes.has(value)) {
-            console.log(`[Tree Build] ${'  '.repeat(level)}⚠ Skipping "${value}" - already processed (prevents infinite loop)`);
+            debugLog(`[Tree Build] ${'  '.repeat(level)}⚠ Skipping "${value}" - already processed (prevents infinite loop)`);
             return null;
         }
         if (!value) return null;
@@ -1095,10 +1236,11 @@ function updateTreeView() {
         }
 
         const indent = '  '.repeat(level);
-        console.log(`${indent}[Depth ${level}] Processing node: "${value}"`);
+        debugLog(`${indent}[Depth ${level}] Processing node: "${value}"`);
 
         const icons = ['fas fa-folder', 'fas fa-folder-open', 'fas fa-toolbox'];
-        const rowData = excelData.find(row => normalizeAssetId(row[columnMappings.child]) === value);
+        // PERFORMANCE: O(1) lookup using pre-built index instead of O(n) find()
+        const rowData = rowDataIndex.get(value);
         const familyPath = rowData ? rowData['Family Path'] : 'N/A';
         const parentChild = rowData ? rowData['Parent-Child(s)'] : 'N/A';
 
@@ -1106,7 +1248,7 @@ function updateTreeView() {
         const pmCount = assetPmAssignments[value] ? assetPmAssignments[value].length : 0;
         const bomCount = assetBomAssignments[value] ? assetBomAssignments[value].length : 0;
 
-        console.log(`[Tree Build] ${'  '.repeat(level)}   ℹ Data: ${!!rowData}, Children: ${parentChildMap.has(value) ? parentChildMap.get(value).length : 0}, PM: ${pmCount}, BOM: ${bomCount}`);
+        debugLog(`[Tree Build] ${'  '.repeat(level)}   ℹ Data: ${!!rowData}, Children: ${parentChildMap.has(value) ? parentChildMap.get(value).length : 0}, PM: ${pmCount}, BOM: ${bomCount}`);
 
         // Build node text with badges
         let nodeText = value;
@@ -1130,7 +1272,7 @@ function updateTreeView() {
         if (parentChildMap.has(value)) {
             const children = parentChildMap.get(value);
             const childList = children.map(c => c.child).join(', ');
-            console.log(`${indent}  ↳ Has ${children.length} children: [${childList}]`);
+            debugLog(`${indent}  ↳ Has ${children.length} children: [${childList}]`);
 
             children.forEach(({ child, description }) => {
                 const childNode = addNode(child, false, level + 1);
@@ -1152,7 +1294,7 @@ function updateTreeView() {
                 }
             });
         } else {
-            console.log(`${indent}  ↳ Leaf node (no children)`);
+            debugLog(`${indent}  ↳ Leaf node (no children)`);
         }
 
         // Add PM Tasks folder if there are PM assignments
@@ -1237,24 +1379,24 @@ function updateTreeView() {
         }
     });
 
-    console.log(`[Tree Build] Total unique children in data: ${allChildren.size}`);
-    console.log(`[Tree Build] Total unique parents in data: ${allParentsWithRelationships.size}`);
-    console.log(`[Tree Build] Total parents with children: ${parentChildMap.size}`);
+    debugLog(`[Tree Build] Total unique children in data: ${allChildren.size}`);
+    debugLog(`[Tree Build] Total unique parents in data: ${allParentsWithRelationships.size}`);
+    debugLog(`[Tree Build] Total parents with children: ${parentChildMap.size}`);
 
     const trueRoots = [];
 
     // Find TRUE roots: nodes that appear as parents but NEVER as children
     // These are the top-level nodes where hierarchies start
-    console.log(`[Tree Build] Searching for roots (parents that never appear as children)...`);
+    debugLog(`[Tree Build] Searching for roots (parents that never appear as children)...`);
     parentChildMap.forEach((children, parent) => {
         // A true root is a parent that never appears as anyone's child
         if (!allChildren.has(parent)) {
             trueRoots.push(parent);
-            console.log(`[Tree Build] 🌳 ROOT FOUND: "${parent}" (has ${children.length} direct children)`);
+            debugLog(`[Tree Build] 🌳 ROOT FOUND: "${parent}" (has ${children.length} direct children)`);
         }
     });
 
-    console.log(`[Tree Build] === Total true roots found: ${trueRoots.length} ===`);
+    debugLog(`[Tree Build] === Total true roots found: ${trueRoots.length} ===`);
     if (trueRoots.length === 0) {
         console.error(`[Tree Build] ❌ ERROR: No root nodes found! This will result in an empty tree.`);
         console.error(`[Tree Build] 🔍 Possible causes:`);
@@ -1274,8 +1416,8 @@ function updateTreeView() {
     });
 
     if (orphanCount > 0) {
-        console.log(`[Tree Build] ⚠️ Found ${orphanCount} orphaned assets (no parent defined) - these are excluded from the tree`);
-        console.log(`[Tree Build] 💡 Use "Show Orphan Records" button to assign parents to orphaned assets`);
+        debugLog(`[Tree Build] ⚠️ Found ${orphanCount} orphaned assets (no parent defined) - these are excluded from the tree`);
+        debugLog(`[Tree Build] 💡 Use "Show Orphan Records" button to assign parents to orphaned assets`);
     }
 
     // Build tree from true roots only
@@ -1286,13 +1428,25 @@ function updateTreeView() {
         }
     });
 
-    console.log(`[Tree Build] === Tree build complete ===`);
-    console.log(`[Tree Build] 📊 Statistics:`);
-    console.log(`[Tree Build]    - Root nodes: ${treeData.length}`);
-    console.log(`[Tree Build]    - Total nodes in tree: ${processedNodes.size}`);
-    console.log(`[Tree Build]    - Orphaned assets (excluded): ${orphanCount}`);
-    console.log(`[Tree Build]    - Maximum depth reached: ${maxDepth} levels`);
-    console.log(`[Tree Build]    - Total parent-child relationships: ${parentChildMap.size}`);
+    const buildTime = (performance.now() - startTime).toFixed(2);
+    const stats = window.unicodeNormalizationStats;
+    // Always show summary stats (not gated by debug) - brief one-liner
+    console.log(`[Tree] ${treeData.length} roots | ${processedNodes.size} nodes | depth ${maxDepth} | ${orphanCount} orphans | built in ${buildTime}ms`);
+
+    // Notify user if Unicode characters were stripped (once per load, not spam)
+    if (stats.totalStripped > 0 && !window._unicodeWarningShown) {
+        window._unicodeWarningShown = true;
+        console.warn(`[Tree] ⚠️ Cleaned ${stats.totalStripped} values containing invisible Unicode chars (LTR/RTL marks, zero-width spaces)`);
+        showToast(`Cleaned ${stats.totalStripped} values containing invisible Unicode characters for proper hierarchy matching`, 'info');
+    }
+    debugLog(`[Tree Build] === Tree build complete ===`);
+    debugLog(`[Tree Build] 📊 Statistics:`);
+    debugLog(`[Tree Build]    - Root nodes: ${treeData.length}`);
+    debugLog(`[Tree Build]    - Total nodes in tree: ${processedNodes.size}`);
+    debugLog(`[Tree Build]    - Orphaned assets (excluded): ${orphanCount}`);
+    debugLog(`[Tree Build]    - Maximum depth reached: ${maxDepth} levels`);
+    debugLog(`[Tree Build]    - Total parent-child relationships: ${parentChildMap.size}`);
+    debugLog(`[Tree Build]    - Build time: ${buildTime}ms`);
 
     if (maxDepth < 3 && orphanCount > 0) {
         console.warn(`[Tree Build] ⚠️ WARNING: Maximum depth is only ${maxDepth} levels. Expected 6+ levels.`);
@@ -1401,6 +1555,73 @@ function initializeOrphanSearch() {
     });
 }
 
+// Validate data before export - detect issues that would result in corrupt hierarchies
+function validateDataForExport() {
+    const issues = {
+        circularRefs: [],
+        selfReferences: [],
+        duplicatePairs: [],
+        missingChildIds: 0,
+        orphanCount: 0
+    };
+
+    if (!excelData || !columnMappings.parent || !columnMappings.child) {
+        return issues;
+    }
+
+    const seenPairs = new Set();
+    const parentMap = new Map();
+
+    excelData.forEach((row, index) => {
+        const childValue = normalizeAssetId(row[columnMappings.child]);
+        const parentValue = normalizeAssetId(row[columnMappings.parent]);
+
+        if (!childValue) {
+            issues.missingChildIds++;
+            return;
+        }
+
+        if (!parentValue) {
+            issues.orphanCount++;
+            return;
+        }
+
+        // Self-reference check
+        if (childValue === parentValue) {
+            issues.selfReferences.push(childValue);
+        }
+
+        // Duplicate pair check
+        const pairKey = `${parentValue}||${childValue}`;
+        if (seenPairs.has(pairKey)) {
+            issues.duplicatePairs.push({ parent: parentValue, child: childValue });
+        }
+        seenPairs.add(pairKey);
+
+        parentMap.set(childValue, parentValue);
+    });
+
+    // Circular reference detection using ancestor traversal
+    parentMap.forEach((_, startNode) => {
+        const visited = new Set();
+        let current = startNode;
+        let depth = 0;
+        while (current && depth < 100) {
+            if (visited.has(current)) {
+                if (!issues.circularRefs.includes(startNode)) {
+                    issues.circularRefs.push(startNode);
+                }
+                break;
+            }
+            visited.add(current);
+            current = parentMap.get(current);
+            depth++;
+        }
+    });
+
+    return issues;
+}
+
 async function saveChanges() {
     try {
         if (!excelData || !columnMappings.parent || !columnMappings.child) {
@@ -1408,9 +1629,34 @@ async function saveChanges() {
             return;
         }
 
+        // Pre-export validation
+        const issues = validateDataForExport();
+        const hasErrors = issues.selfReferences.length > 0 || issues.circularRefs.length > 0;
+        const hasWarnings = issues.duplicatePairs.length > 0 || issues.orphanCount > 0 || issues.missingChildIds > 0;
+
+        let validationMessage = '';
+        if (hasErrors || hasWarnings) {
+            validationMessage = '\n\n⚠️ Data Validation Results:\n';
+            if (issues.selfReferences.length > 0) {
+                validationMessage += `\n❌ ${issues.selfReferences.length} self-reference(s) (asset is its own parent)`;
+            }
+            if (issues.circularRefs.length > 0) {
+                validationMessage += `\n❌ ${issues.circularRefs.length} circular reference(s) detected`;
+            }
+            if (issues.duplicatePairs.length > 0) {
+                validationMessage += `\n⚠️ ${issues.duplicatePairs.length} duplicate parent-child pair(s)`;
+            }
+            if (issues.orphanCount > 0) {
+                validationMessage += `\n⚠️ ${issues.orphanCount} orphaned asset(s) (no parent defined)`;
+            }
+            if (issues.missingChildIds > 0) {
+                validationMessage += `\n⚠️ ${issues.missingChildIds} row(s) with missing asset ID`;
+            }
+        }
+
         const confirmed = await showConfirmDialog(
             'Export Changes',
-            'Are you sure you want to export the current hierarchy to Excel?'
+            `Are you sure you want to export the current hierarchy to Excel?${validationMessage}`
         );
 
         if (!confirmed) {
