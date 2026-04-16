@@ -12,7 +12,7 @@
 </head>
 <body>
     <div class="logo-container">
-        <img src="assets/logo.png" alt="Company Logo" class="logo">
+        <img src="logo.png" alt="Company Logo" class="logo">
     </div>
     <div class="container" id="mainContainer">
         <div class="sidebar" id="leftPanel">
@@ -122,6 +122,9 @@
             <div class="actions">
                 <button id="addNewRecord" class="primary-button">Add New Record</button>
                 <button id="showOrphans" class="secondary-button">Show Orphan Records</button>
+                <button id="autoGenerateHierarchy" class="warning-button" title="Auto-detect and fill in missing hierarchy levels">🔧 Fix Hierarchy Levels</button>
+                <button id="managePM" class="primary-button">Manage PM Records</button>
+                <button id="manageBOM" class="primary-button">Manage Asset BOM</button>
                 <button id="undoHierarchy" class="undo-button">Undo</button>
                 <button id="saveChanges" class="primary-button">Export Changes</button>
             </div>
@@ -137,7 +140,7 @@
         <div class="resize-handle right-handle"></div>
         <div class="edit-panel" id="rightPanel">
             <div class="logo-space">
-                <img src="assets/logo.png" alt="Company Logo" class="logo">
+                <img src="logo.png" alt="Company Logo" class="logo">
             </div>
             <div class="edit-panel-content">
                 <div class="edit-form-container">
@@ -146,6 +149,26 @@
                         <p class="placeholder-text">Select a node in the tree to edit its values</p>
                     </div>
                 </div>
+
+                <!-- PM/BOM Details Section -->
+                <div id="pmBomDetailsSection" class="pm-bom-details-section" style="display: none;">
+                    <h3>PM & BOM Assignments</h3>
+
+                    <div class="details-group">
+                        <h4><i class="fas fa-clipboard-check"></i> PM Tasks (<span id="pmDetailsCount">0</span>)</h4>
+                        <div id="pmDetailsList" class="details-list">
+                            <p class="placeholder-text">No PM tasks assigned</p>
+                        </div>
+                    </div>
+
+                    <div class="details-group">
+                        <h4><i class="fas fa-box"></i> BOM Items (<span id="bomDetailsCount">0</span>)</h4>
+                        <div id="bomDetailsList" class="details-list">
+                            <p class="placeholder-text">No BOM items assigned</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="edit-panel-footer">
                     <div class="edit-actions" style="display: none;">
                         <button id="undoEditChanges" class="undo-button">Undo Edit</button>
@@ -194,6 +217,125 @@
                     <button id="saveNewRecord" class="primary-button">Save Record</button>
                     <button id="cancelNewRecord" class="secondary-button">Cancel</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Confirmation Dialog -->
+    <div id="confirmDialog" class="modal">
+        <div class="modal-content confirm-dialog">
+            <h3 id="confirmTitle">Confirm Action</h3>
+            <p id="confirmMessage">Are you sure you want to proceed?</p>
+            <div class="modal-actions">
+                <button id="confirmYes" class="primary-button">Yes</button>
+                <button id="confirmNo" class="secondary-button">No</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PM Records Management Modal -->
+    <div id="pmManagementModal" class="modal">
+        <div class="modal-content large-modal">
+            <span class="modal-close" id="closePmModalX">&times;</span>
+            <h3>Manage PM Records</h3>
+            <div class="pm-management-container">
+                <div class="pm-section">
+                    <h4>Available PM Tasks</h4>
+                    <div class="search-box">
+                        <input type="text" id="pmSearchInput" placeholder="Search PM tasks...">
+                    </div>
+                    <div id="pmList" class="item-list">
+                        <!-- PM items will be populated here -->
+                    </div>
+                    <div class="add-pm-form">
+                        <h5>Load PM Tasks from File</h5>
+                        <input type="file" id="pmFileInput" accept=".xlsx, .xls">
+                        <button id="loadPmFile" class="secondary-button">Load PM File</button>
+                        <h5>Add New PM Task</h5>
+                        <input type="text" id="newPmCode" placeholder="PM Code">
+                        <input type="text" id="newPmDescription" placeholder="Description">
+                        <input type="text" id="newPmFrequency" placeholder="Frequency">
+                        <button id="addNewPm" class="primary-button">Add PM</button>
+                    </div>
+                </div>
+                <div class="pm-section">
+                    <h4>Selected Assets/Groups</h4>
+                    <div id="selectedNodesDisplay" class="selected-nodes-display">
+                        <p class="placeholder-text">No nodes selected</p>
+                    </div>
+                    <div id="affectedNodesInfo" class="affected-nodes-info" style="display: none;">
+                        <small>Will apply to <strong id="affectedNodesCount">0</strong> asset(s) including child items</small>
+                    </div>
+                    <div class="copy-from-section">
+                        <h5>Copy PM from Existing Asset</h5>
+                        <select id="pmCopySource" class="copy-source-select">
+                            <option value="">-- Select Asset --</option>
+                        </select>
+                        <button id="copyPmBtn" class="secondary-button">Copy PM Tasks</button>
+                    </div>
+                    <h4>Assigned PM Tasks</h4>
+                    <div id="assignedPmList" class="item-list">
+                        <!-- Assigned PMs will be displayed here -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="closePmModal" class="secondary-button">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Asset BOM Management Modal -->
+    <div id="bomManagementModal" class="modal">
+        <div class="modal-content large-modal">
+            <span class="modal-close" id="closeBomModalX">&times;</span>
+            <h3>Manage Asset BOM (Bill of Materials)</h3>
+            <div class="bom-management-container">
+                <div class="bom-section">
+                    <h4>Available Inventory Items</h4>
+                    <div class="search-box">
+                        <input type="text" id="bomSearchInput" placeholder="Search inventory...">
+                    </div>
+                    <div id="bomList" class="item-list">
+                        <!-- BOM items will be populated here -->
+                    </div>
+                    <div class="add-bom-form">
+                        <h5>Load Inventory from File</h5>
+                        <input type="file" id="bomFileInput" accept=".xlsx, .xls">
+                        <button id="loadBomFile" class="secondary-button">Load Inventory File</button>
+                        <h5>Add New Inventory Item</h5>
+                        <input type="text" id="newBomPartNumber" placeholder="Part Number">
+                        <input type="text" id="newBomDescription" placeholder="Description">
+                        <input type="number" id="newBomQuantity" placeholder="Quantity" value="1">
+                        <button id="addNewBom" class="primary-button">Add Item</button>
+                    </div>
+                </div>
+                <div class="bom-section">
+                    <h4>Selected Assets/Groups</h4>
+                    <div id="selectedNodesBomDisplay" class="selected-nodes-display">
+                        <p class="placeholder-text">No nodes selected</p>
+                    </div>
+                    <div id="affectedNodesBomInfo" class="affected-nodes-info" style="display: none;">
+                        <small>Will apply to <strong id="affectedNodesBomCount">0</strong> asset(s) including child items</small>
+                    </div>
+                    <div class="copy-from-section">
+                        <h5>Copy BOM from Existing Asset</h5>
+                        <select id="bomCopySource" class="copy-source-select">
+                            <option value="">-- Select Asset --</option>
+                        </select>
+                        <button id="copyBomBtn" class="secondary-button">Copy BOM Items</button>
+                    </div>
+                    <h4>Assigned BOM Items</h4>
+                    <div id="assignedBomList" class="item-list">
+                        <!-- Assigned BOM items will be displayed here -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="closeBomModal" class="secondary-button">Close</button>
             </div>
         </div>
     </div>
